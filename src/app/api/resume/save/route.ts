@@ -1,47 +1,65 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
 import Resume from "@/src/models/Resume";
-import jwt from "jsonwebtoken";
+import User from "@/src/models/User";
 
 export async function POST(req: Request) {
   try {
     await connectDB();
 
-    // 1. Xác thực người dùng qua Token gửi lên từ Header
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ message: "Bạn chưa đăng nhập" }, { status: 401 });
-    }
-    const token = authHeader.split(" ")[1];
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    
-    if (decoded.role !== "CANDIDATE") {
-      return NextResponse.json({ message: "Chỉ ứng viên mới có quyền tạo CV" }, { status: 0 });
+    // 1. Lấy ID Ứng viên từ Header
+    const candidateId = req.headers.get("x-candidate-id");
+    if (!candidateId) {
+      return NextResponse.json(
+        { message: "Yêu cầu bị từ chối. Thiếu thông tin định danh Ứng viên (x-candidate-id)!" },
+        { status: 401 }
+      );
     }
 
-    // 2. Lấy dữ liệu CV từ body
-    const { title, cvData } = await req.json();
+    // Xác thực người dùng trong DB xem có tồn tại và đúng role CANDIDATE không
+    const candidate = await User.findById(candidateId);
+    if (!candidate || candidate.role !== "CANDIDATE") {
+      return NextResponse.json(
+        { message: "Bạn không có quyền truy cập. Chỉ tài khoản CANDIDATE mới được tạo CV!" },
+        { status: 403 }
+      );
+    }
+
+    // 2. Nhận dữ liệu CV từ body gửi lên
+    const { title, type, fileUrl, cvData, templateName, isPublic } = await req.json();
 
     if (!title) {
-      return NextResponse.json({ message: "Vui lòng nhập tiêu đề CV" }, { status: 400 });
+      return NextResponse.json({ message: "Vui lòng nhập tiêu đề CV (title)" }, { status: 400 });
     }
 
-    // 3. Tiến hành Lưu hoặc Cập nhật nếu đã có sẵn (Upsert)
+    // Chuẩn hóa cấu trúc cvData từ body để khớp với lồng ghép Schema của bạn
+    const formattedCvData = {
+      summary: cvData?.summary || "",
+      education: Array.isArray(cvData?.education) ? cvData.education : [],
+      experience: Array.isArray(cvData?.experience) ? cvData.experience : [],
+      skills: Array.isArray(cvData?.skills) ? cvData.skills : [],
+      projects: Array.isArray(cvData?.projects) ? cvData.projects : []
+    };
+
+    // 3. Tiến hành Lưu hoặc Cập nhật nếu trùng bộ đôi (candidateId + title)
     const updatedResume = await Resume.findOneAndUpdate(
-      { candidateId: decoded.userId, title: title }, // Điều kiện tìm kiếm
+      { candidateId: candidateId, title: title }, // Tìm CV cũ cùng tên của user này
       {
-        candidateId: decoded.userId,
+        candidateId: candidateId,
         title,
-        type: "ONLINE",
-        cvData,
-        isPublic: true
+        type: type || "ONLINE",
+        fileUrl: fileUrl || "",
+        cvData: formattedCvData,
+        templateName: templateName || "default-theme",
+        isPublic: isPublic !== undefined ? isPublic : true
       },
-      { new: true, upsert: true } // Nếu chưa có thì tạo mới, có rồi thì update
+      { new: true, upsert: true, runValidators: true } // Chưa có tự tạo mới (upsert)
     );
 
     return NextResponse.json({
-      message: "Lưu CV thành công!",
-      resumeId: updatedResume._id
+      message: "Lưu thông tin CV thành công!",
+      resumeId: updatedResume._id,
+      resume: updatedResume
     }, { status: 200 });
 
   } catch (error: any) {

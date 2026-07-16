@@ -16,7 +16,8 @@ const UserSchema = new Schema(
     otpCode: { type: String, default: null },
     otpExpires: { type: Date, default: null },
     // Liên kết tới Công ty nếu là MANAGER
-    companyId: { type: Schema.Types.ObjectId, ref: "Company", default: null }
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", default: null },
+    isBlocked: { type: Boolean, default: false }
   },
   { timestamps: true }
 );
