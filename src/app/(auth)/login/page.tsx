@@ -3,7 +3,6 @@ import { useState } from "react";
 import Link from "next/link";
 
 export default function LoginPage() {
-  // Đồng bộ tên hệ thống
   const systemNameLeft = "Grand";
   const systemNameRight = "Job";
 
@@ -12,7 +11,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
-  // State quản lý hiệu ứng giao diện
   const [isButtonHovered, setIsButtonHovered] = useState(false);
   const [isForgotHovered, setIsForgotHovered] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -30,63 +28,86 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
+
+      // 🔍 LOG DỮ LIỆU BẢNG BẮT ĐƯỢC TỪ API ĐỂ KIỂM TRA
+      console.log("👉 Response từ API Login:", data);
+
       if (!res.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
-      // Lưu Token vào LocalStorage để duy trì trạng thái đăng nhập
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Bắt các trường hợp đặt tên Token khác nhau từ API
+      const token = data.token || data.accessToken || data.data?.token;
+      const user = data.user || data.data?.user;
 
-      alert(`Chào mừng quay trở lại, ${data.user.fullName}!`);
+      if (!token) {
+        console.error("❌ Không tìm thấy Token trong response API!", data);
+        throw new Error("Không nhận được mã xác thực (Token) từ hệ thống");
+      }
+
+      // 💾 LƯU VÀO LOCALSTORAGE
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // 🔍 VERIFY XEM ĐÃ LƯU THÀNH CÔNG CHƯA
+      console.log("✅ Đã lưu Token vào LocalStorage:", localStorage.getItem("token"));
+      console.log("✅ Đã lưu User vào LocalStorage:", localStorage.getItem("user"));
+
+      alert(`Chào mừng quay trở lại, ${user?.fullName || user?.name || "Bạn"}!`);
       
-      // Điều hướng về trang chủ sau khi đăng nhập thành công
+      // Chuyển hướng trang
       window.location.href = "/";
     } catch (err: any) {
+      console.error("❌ Lỗi Đăng Nhập:", err.message);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Hàm tạo style cho các ô input khi được focus
-  const inputStyle = (fieldName: string) => ({
-    width: "100%",
-    padding: "10px 14px",
-    border: focusedField === fieldName ? "1px solid #10b981" : "1px solid #cbd5e1",
-    borderRadius: "8px",
-    outline: "none",
-    fontSize: "14px",
-    color: "#1e293b",
-    boxShadow: focusedField === fieldName ? "0 0 0 3px rgba(16, 185, 129, 0.15)" : "none",
-    transition: "all 0.2s ease",
-    boxSizing: "border-box" as const,
-  });
+  const getInputStyle = (fieldName: string) => {
+    const isFocused = focusedField === fieldName;
+    return {
+      width: "100%",
+      padding: "12px 16px",
+      border: isFocused ? "1.5px solid #10b981" : "1.5px solid #e2e8f0",
+      borderRadius: "10px",
+      outline: "none",
+      fontSize: "14px",
+      color: "#0f172a",
+      backgroundColor: isFocused ? "#ffffff" : "#f8fafc",
+      boxShadow: isFocused ? "0 0 0 4px rgba(16, 185, 129, 0.12)" : "none",
+      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+      boxSizing: "border-box" as const,
+    };
+  };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc", padding: "0 16px", fontFamily: "sans-serif" }}>
-      <form onSubmit={handleLogin} style={{ width: "100%", maxWidth: "440px", backgroundColor: "#ffffff", padding: "32px", borderRadius: "16px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", border: "1px solid #f1f5f9" }}>
+    <div style={styles.container}>
+      <form onSubmit={handleLogin} style={styles.card}>
         
-        {/* TIÊU ĐỀ FORM */}
-        <h2 style={{ fontSize: "24px", fontWeight: "700", textAlign: "center", color: "#10b981", marginBottom: "24px", marginTop: 0 }}>
-          Đăng nhập <span style={{ color: "#1e293b" }}>{systemNameLeft}{systemNameRight}</span>
-        </h2>
+        {/* LOGO & TIÊU ĐỀ */}
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+          <h2 style={styles.title}>
+            Đăng nhập <span style={{ color: "#0f172a" }}>{systemNameLeft}{systemNameRight}</span>
+          </h2>
+          <p style={styles.subtitle}>Nhập thông tin tài khoản của bạn để tiếp tục</p>
+        </div>
 
-        {/* HIỂN THỊ THÔNG BÁO LỖI */}
+        {/* CẢNH BÁO LỖI */}
         {error && (
-          <div style={{ marginBottom: "16px", padding: "12px", fontSize: "14px", color: "#b91c1c", backgroundColor: "#fef2f2", borderRadius: "8px", border: "1px solid #fee2e2" }}>
-            {error}
+          <div style={styles.errorBox}>
+            <span style={{ marginRight: "6px" }}>⚠️</span> {error}
           </div>
         )}
 
-        {/* KHU VỰC Ô NHẬP LIỆU */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          
-          {/* Ô Email */}
+        {/* INPUT FIELDS */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#475569", marginBottom: "6px" }}>Email</label>
+            <label style={styles.label}>Địa chỉ Email</label>
             <input 
               type="email" 
               required 
-              style={inputStyle("email")}
+              placeholder="nhapemail@example.com"
+              style={getInputStyle("email")}
               value={email} 
               onFocus={() => setFocusedField("email")}
               onBlur={() => setFocusedField(null)}
@@ -94,13 +115,13 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Ô Mật khẩu */}
           <div>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#475569", marginBottom: "6px" }}>Mật khẩu</label>
+            <label style={styles.label}>Mật khẩu</label>
             <input 
               type="password" 
               required 
-              style={inputStyle("password")}
+              placeholder="••••••••"
+              style={getInputStyle("password")}
               value={password} 
               onFocus={() => setFocusedField("password")}
               onBlur={() => setFocusedField(null)}
@@ -110,15 +131,16 @@ export default function LoginPage() {
         </div>
 
         {/* QUÊN MẬT KHẨU */}
-        <div style={{ textAlign: "right", marginTop: "12px" }}>
+        <div style={{ textAlign: "right", marginTop: "14px" }}>
           <Link 
             href="/forgot-password" 
             onMouseEnter={() => setIsForgotHovered(true)}
             onMouseLeave={() => setIsForgotHovered(false)}
             style={{ 
               fontSize: "13px", 
-              color: isForgotHovered ? "#059669" : "#10b981", 
-              textDecoration: isForgotHovered ? "underline" : "none",
+              fontWeight: "600",
+              color: isForgotHovered ? "#047857" : "#10b981", 
+              textDecoration: "none",
               transition: "color 0.2s" 
             }}
           >
@@ -126,7 +148,7 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* NÚT ĐĂNG NHẬP */}
+        {/* NÚT SUBMIT */}
         <button 
           type="submit" 
           disabled={loading} 
@@ -134,22 +156,77 @@ export default function LoginPage() {
           onMouseLeave={() => setIsButtonHovered(false)}
           style={{ 
             width: "100%", 
-            marginTop: "24px", 
+            marginTop: "28px", 
             backgroundColor: loading ? "#cbd5e1" : (isButtonHovered ? "#059669" : "#10b981"), 
             color: "#ffffff", 
-            padding: "12px", 
-            borderRadius: "8px", 
+            padding: "14px", 
+            borderRadius: "10px", 
             fontWeight: "600", 
-            fontSize: "16px", 
+            fontSize: "15px", 
             border: "none", 
             cursor: loading ? "not-allowed" : "pointer", 
-            transition: "background-color 0.2s ease",
-            boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)"
+            transition: "all 0.2s ease",
+            boxShadow: isButtonHovered && !loading 
+              ? "0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -4px rgba(16, 185, 129, 0.2)" 
+              : "0 4px 6px -1px rgba(16, 185, 129, 0.1)"
           }}
         >
-          {loading ? "Đang kiểm tra..." : "Đăng nhập"}
+          {loading ? "Đang xác thực..." : "Đăng nhập ngay"}
         </button>
+
       </form>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    display: "flex",
+    minHeight: "100vh",
+    alignItems: "center",
+    justify: "center",
+    background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+    padding: "20px 16px",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  card: {
+    width: "100%",
+    maxWidth: "420px",
+    backgroundColor: "#ffffff",
+    padding: "40px 32px",
+    borderRadius: "20px",
+    boxShadow: "0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02)",
+    border: "1px solid #f1f5f9",
+  },
+  title: {
+    fontSize: "26px",
+    fontWeight: "800",
+    color: "#10b981",
+    marginBottom: "6px",
+    marginTop: 0,
+    letterSpacing: "-0.5px",
+  },
+  subtitle: {
+    fontSize: "14px",
+    color: "#64748b",
+    margin: 0,
+  },
+  label: {
+    display: "block",
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "#334155",
+    marginBottom: "8px",
+  },
+  errorBox: {
+    marginBottom: "20px",
+    padding: "12px 16px",
+    fontSize: "13.5px",
+    color: "#991b1b",
+    backgroundColor: "#fef2f2",
+    borderRadius: "10px",
+    border: "1px solid #fee2e2",
+    display: "flex",
+    alignItems: "center",
+  },
+};

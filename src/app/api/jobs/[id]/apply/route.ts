@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
+import { getAuthPayload } from "@/src/lib/auth";
 import Application from "@/src/models/Application"; 
 import User from "@/src/models/User";
 import Resume from "@/src/models/Resume";
@@ -8,9 +9,8 @@ import mongoose from "mongoose";
 // ==========================================
 // 📥 HÀM POST: ỨNG TUYỂN THỰC TẾ (LƯU VÀO DB)
 // ==========================================
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // FIX NEXT.JS NEW VERSION: Await params trước khi đọc thuộc tính id
     const resolvedParams = await params;
     const jobId = resolvedParams.id; 
 
@@ -18,10 +18,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
     await connectDB();
 
     // 2. Lấy dữ liệu định danh
-    const candidateId = request.headers.get("x-candidate-id");
+    let candidateId: string | null = request.headers.get("x-candidate-id");
+    if (!candidateId) {
+      const auth = getAuthPayload(request.headers);
+      candidateId = auth?.role === "CANDIDATE" && auth.userId ? auth.userId : null;
+    }
+
     if (!candidateId || !mongoose.Types.ObjectId.isValid(candidateId)) {
       return NextResponse.json(
-        { success: false, message: "Thiếu hoặc sai định dạng x-candidate-id ở Header!" }, 
+        { success: false, message: "Thiếu hoặc sai định dạng x-candidate-id ở Header hoặc token không hợp lệ!" }, 
         { status: 401 }
       );
     }
@@ -81,9 +86,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 // ==========================================
 // 📊 HÀM GET: LẤY DANH SÁCH THỰC TẾ
 // ==========================================
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // FIX NEXT.JS NEW VERSION: Await params
     const resolvedParams = await params;
     const jobId = resolvedParams.id;
 

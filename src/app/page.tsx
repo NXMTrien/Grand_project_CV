@@ -1,29 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function TopCVHomePage() {
   const [searchTitle, setSearchTitle] = useState("");
-  const [hoveredJob, setHoveredJob] = useState<number | null>(null);
+  const [hoveredJob, setHoveredJob] = useState<string | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [hotJobs, setHotJobs] = useState<any[]>([]);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(true);
 
-  // Dữ liệu mẫu bổ sung thêm chữ cái viết tắt đại diện cho Logo Công ty để card việc làm nhìn đầy đặn và thật 100%
-  const hotJobs = [
-    { id: 1, title: "Tổng Quản Lý Nhà Hàng - Thu Nhập Đến 40 Triệu", company: "CÔNG TY CỔ PHẦN DỊCH VỤ & ẨM THỰC P...", salary: "20 - 40 triệu", location: "Hồ Chí Minh", logoText: "P", logoBg: "#ffedd5", logoColor: "#ea580c" },
-    { id: 2, title: "Nhân Viên Tư Vấn Tài Chính / Telesales / Call Center", company: "CÔNG TY TÀI CHÍNH TNHH NGÂN HÀNG VI...", salary: "10 - 30 triệu", location: "Hồ Chí Minh", logoText: "V", logoBg: "#dbeafe", logoColor: "#2563eb" },
-    { id: 3, title: "Nhân Viên Kinh Doanh - Tư Vấn Nhà Phố - Tự Do", company: "CHI NHÁNH SỐ 2 CÔNG TY CỔ PHẦN TẬP Đ...", salary: "30.5 - 100 triệu", location: "Hồ Chí Minh", logoText: "Đ", logoBg: "#f3e8ff", logoColor: "#9333ea" },
-    { id: 4, title: "Trưởng Phòng Kinh Doanh Dự Án BCONS CITY LIFE", company: "CÔNG TY TNHH XÂY DỰNG B-ONE TECH", salary: "20 - 100 triệu", location: "Hồ Chí Minh", logoText: "B", logoBg: "#fee2e2", logoColor: "#dc2626" },
-    { id: 5, title: "Kỹ Sư Xây Dựng (Giám Sát Hiện Trường Civil)", company: "CÔNG TY TNHH BAROCK VINA", salary: "Thỏa thuận", location: "Hồ Chí Minh", logoText: "R", logoBg: "#e0f2fe", logoColor: "#0284c7" },
-    { id: 6, title: "Trưởng Phòng Kỹ Thuật Sản Xuất (Ngành May)", company: "CÔNG TY CP ĐẦU TƯ THƯƠNG MẠI SMC", salary: "Thỏa thuận", location: "Hồ Chí Minh", logoText: "S", logoBg: "#e2e8f0", logoColor: "#475569" },
-    { id: 7, title: "Chuyên Viên Kinh Doanh Bất Động Sản (Quận 2)", company: "CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT VẠ...", salary: "Thỏa thuận", location: "Hồ Chí Minh", logoText: "V", logoBg: "#fef9c3", logoColor: "#ca8a04" },
-    { id: 8, title: "Chuyên Viên Giải Phóng Mặt Bằng Thu Nhập Cao", company: "CÔNG TY CỔ PHẦN ĐẦU TƯ FECON", salary: "18 - 23 triệu", location: "Bắc Ninh", logoText: "F", logoBg: "#dcfce7", logoColor: "#16a34a" },
-  ];
+  useEffect(() => {
+    async function loadHotJobs() {
+      try {
+        const res = await fetch("/api/jobs");
+        if (!res.ok) {
+          throw new Error("Không tải được việc làm");
+        }
+        const json = await res.json();
+        setHotJobs(
+          (json.data || []).map((job: any) => ({
+            id: job._id,
+            title: job.title,
+            company: job.companyId?.name || "Công ty chưa rõ",
+            salary:
+              job.salaryMin && job.salaryMax
+                ? `${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()} đồng`
+                : "Thỏa thuận",
+            location: job.location || "Chưa rõ",
+            logoText: job.companyId?.name?.charAt(0) || "C",
+            logoBg: "#f8fafc",
+            logoColor: "#0f172a"
+          }))
+        );
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoadingJobs(false);
+      }
+    }
+
+    loadHotJobs();
+  }, []);
 
   return (
     <div style={{ backgroundColor: "#f4f6f9", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", color: "#334155" }}>
       
       {/* SECTION 1: HERO SEARCH BACKGROUND (GRADIENT XANH ĐẬM SANG TRỌNG) */}
-      <div style={{ background: "linear-gradient(135deg, #004d33 0%, #007d53 100%)", padding: "50px 20px 70px 20px", textAlign: "center", position: "relative" }}>
+      <div style={{ background: "linear-gradient(135deg, #064e3b 0%, #10b981 100%)", padding: "50px 20px 70px 20px", textAlign: "center", position: "relative" }}>
         <h1 style={{ color: "#ffffff", fontSize: "26px", fontWeight: "700", marginBottom: "12px", margin: 0, letterSpacing: "-0.02em" }}>
           Tìm việc làm nhanh 24h, việc làm mới nhất trên toàn quốc
         </h1>
@@ -80,7 +103,7 @@ export default function TopCVHomePage() {
 
           {/* Nút Tìm Kiếm bo tròn lớn */}
           <button style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", padding: "12px 36px", borderRadius: "100px", fontWeight: "600", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 4px 6px -1px rgba(16, 185, 129, 0.3)", transition: "background 0.2s" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#059669")}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#047857")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#10b981")}>
             Tìm kiếm
           </button>
@@ -130,7 +153,7 @@ export default function TopCVHomePage() {
 
       {/* SECTION 3: GRID DANH SÁCH VIỆC LÀM TỐT NHẤT */}
       <div style={{ maxWidth: "1240px", margin: "0 auto 60px auto", padding: "0 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between", marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ width: "4px", height: "24px", backgroundColor: "#10b981", borderRadius: "10px" }}></div>
             <h2 style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>Việc làm tốt nhất</h2>
@@ -140,78 +163,88 @@ export default function TopCVHomePage() {
 
         {/* THIẾT KẾ CARD CHI TIẾT GIỐNG 90% TOPCV */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "20px" }}>
-          {hotJobs.map((job) => (
-            <div 
-              key={job.id}
-              onMouseEnter={() => setHoveredJob(job.id)}
-              onMouseLeave={() => setHoveredJob(null)}
-              style={{ 
-                backgroundColor: "#ffffff", 
-                padding: "20px", 
-                borderRadius: "16px", 
-                boxShadow: hoveredJob === job.id ? "0 12px 25px -5px rgba(16, 185, 129, 0.15)" : "0 4px 6px -1px rgba(0,0,0,0.02)", 
-                border: "1px solid",
-                borderColor: hoveredJob === job.id ? "#10b981" : "#e2e8f0",
-                transform: hoveredJob === job.id ? "translateY(-2px)" : "none",
-                transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "pointer",
-                display: "flex",
-                gap: "16px"
-              }}
-            >
-              {/* Ảnh đại diện logo giả lập bên trái Card */}
-              <div style={{ 
-                width: "52px", 
-                height: "52px", 
-                backgroundColor: job.logoBg, 
-                color: job.logoColor, 
-                borderRadius: "12px", 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "center", 
-                fontSize: "20px", 
-                fontWeight: "700",
-                flexShrink: 0,
-                border: "1px solid #f1f5f9"
-              }}>
-                {job.logoText}
-              </div>
-
-              {/* Khu vực thông tin chi tiết */}
-              <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flexGrow: 1, minWidth: 0 }}>
-                <div>
-                  <h3 style={{ 
-                    fontSize: "14.5px", 
-                    fontWeight: "700", 
-                    color: hoveredJob === job.id ? "#10b981" : "#1e293b", 
-                    margin: "0 0 6px 0", 
-                    display: "-webkit-box", 
-                    WebkitLineClamp: 2, 
-                    WebkitBoxOrient: "vertical", 
-                    overflow: "hidden", 
-                    lineHeight: "1.4",
-                    transition: "color 0.2s"
-                  }}>
-                    {job.title}
-                  </h3>
-                  <p style={{ fontSize: "12.5px", color: "#64748b", margin: "0 0 14px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: "500" }}>
-                    {job.company}
-                  </p>
-                </div>
-
-                {/* Phần Tag lương & Địa điểm */}
-                <div style={{ display: "flex", gap: "8px", fontSize: "12px" }}>
-                  <span style={{ color: "#10b981", fontWeight: "700", backgroundColor: "#f0fdf4", padding: "4px 10px", borderRadius: "6px" }}>
-                    💵 {job.salary}
-                  </span>
-                  <span style={{ color: "#475569", backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "6px", fontWeight: "500" }}>
-                    📍 {job.location}
-                  </span>
-                </div>
-              </div>
-
+          {isLoadingJobs ? (
+            <div style={{ gridColumn: "1 / -1", padding: "40px", textAlign: "center", color: "#64748b" }}>
+              Đang tải việc làm tốt nhất...
             </div>
-          ))}
+          ) : hotJobs.length === 0 ? (
+            <div style={{ gridColumn: "1 / -1", padding: "40px", textAlign: "center", color: "#64748b" }}>
+              Chưa có dữ liệu việc làm để hiển thị.
+            </div>
+          ) : (
+            hotJobs.map((job) => (
+              <div 
+                key={job.id}
+                onMouseEnter={() => setHoveredJob(job.id)}
+                onMouseLeave={() => setHoveredJob(null)}
+                style={{ 
+                  backgroundColor: "#ffffff", 
+                  padding: "20px", 
+                  borderRadius: "16px", 
+                  boxShadow: hoveredJob === job.id ? "0 12px 25px -5px rgba(16, 185, 129, 0.15)" : "0 4px 6px -1px rgba(0,0,0,0.02)", 
+                  border: "1px solid",
+                  borderColor: hoveredJob === job.id ? "#10b981" : "#e2e8f0",
+                  transform: hoveredJob === job.id ? "translateY(-2px)" : "none",
+                  transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                  cursor: "pointer",
+                  display: "flex",
+                  gap: "16px"
+                }}
+              >
+                {/* Ảnh đại diện logo giả lập bên trái Card */}
+                <div style={{ 
+                  width: "52px", 
+                  height: "52px", 
+                  backgroundColor: job.logoBg, 
+                  color: job.logoColor, 
+                  borderRadius: "12px", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  fontSize: "20px", 
+                  fontWeight: "700",
+                  flexShrink: 0,
+                  border: "1px solid #f1f5f9"
+                }}>
+                  {job.logoText}
+                </div>
+
+                {/* Khu vực thông tin chi tiết */}
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flexGrow: 1, minWidth: 0 }}>
+                  <div>
+                    <h3 style={{ 
+                      fontSize: "14.5px", 
+                      fontWeight: "700", 
+                      color: hoveredJob === job.id ? "#10b981" : "#1e293b", 
+                      margin: "0 0 6px 0", 
+                      display: "-webkit-box", 
+                      WebkitLineClamp: 2, 
+                      WebkitBoxOrient: "vertical", 
+                      overflow: "hidden", 
+                      lineHeight: "1.4",
+                      transition: "color 0.2s"
+                    }}>
+                      {job.title}
+                    </h3>
+                    <p style={{ fontSize: "12.5px", color: "#64748b", margin: "0 0 14px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: "500" }}>
+                      {job.company}
+                    </p>
+                  </div>
+
+                  {/* Phần Tag lương & Địa điểm */}
+                  <div style={{ display: "flex", gap: "8px", fontSize: "12px" }}>
+                    <span style={{ color: "#10b981", fontWeight: "700", backgroundColor: "#f0fdf4", padding: "4px 10px", borderRadius: "6px" }}>
+                      💵 {job.salary}
+                    </span>
+                    <span style={{ color: "#475569", backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "6px", fontWeight: "500" }}>
+                      📍 {job.location}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+            ))
+          )}
         </div>
       </div>
 

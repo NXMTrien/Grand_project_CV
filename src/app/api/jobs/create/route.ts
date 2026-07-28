@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
+import { getAuthPayload } from "@/src/lib/auth";
 import Job from "@/src/models/Job";
 import User from "@/src/models/User";
 
@@ -20,11 +21,16 @@ export async function POST(req: Request) {
   try {
     await connectDB();
 
-    // 1. Lấy thông tin người đăng từ Header x-manager-id
-    const managerId = req.headers.get("x-manager-id");
+    // 1. Lấy thông tin người đăng từ Header x-manager-id hoặc JWT Bearer
+    let managerId: string | null = req.headers.get("x-manager-id");
+    if (!managerId) {
+      const auth = getAuthPayload(req.headers);
+      managerId = auth?.role === "MANAGER" && auth.userId ? auth.userId : null;
+    }
+
     if (!managerId) {
       return NextResponse.json(
-        { message: "Yêu cầu bị từ chối. Thiếu thông tin định danh Manager (x-manager-id)!" },
+        { message: "Yêu cầu bị từ chối. Thiếu thông tin định danh Manager (x-manager-id) hoặc token hợp lệ!" },
         { status: 401 }
       );
     }

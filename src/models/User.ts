@@ -13,6 +13,7 @@ const UserSchema = new Schema(
     },
     avatar: { type: String, default: "" },
     isVerified: { type: Boolean, default: false },
+    isFirstLogin: { type: Boolean, default: true },
     otpCode: { type: String, default: null },
     otpExpires: { type: Date, default: null },
     // Liên kết tới Công ty nếu là MANAGER

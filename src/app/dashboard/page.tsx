@@ -5,8 +5,10 @@ import { useState } from "react";
 export default function TopCVHomePage() {
   const [searchTitle, setSearchTitle] = useState("");
   const [hoveredJob, setHoveredJob] = useState<number | null>(null);
+  const [hoveredCat, setHoveredCat] = useState<number | null>(null);
+  const [isSearchBtnHovered, setIsSearchBtnHovered] = useState(false);
 
-  // Dữ liệu mẫu danh sách việc làm tốt nhất (Hot Jobs)
+  // Dữ liệu mẫu việc làm (Hot Jobs)
   const hotJobs = [
     { id: 1, title: "Tổng Quản Lý Nhà Hàng - Thu Nhập Đến 40 Triệu", company: "CÔNG TY CỔ PHẦN DỊCH VỤ & ẨM THỰC P...", salary: "20 - 40 triệu", location: "Hồ Chí Minh" },
     { id: 2, title: "Nhân Viên Tư Vấn Tải Chính/Telesales/Call Center", company: "CÔNG TY TÀI CHÍNH TNHH NGÂN HÀNG VI...", salary: "10 - 30 triệu", location: "Hồ Chí Minh" },
@@ -18,24 +20,34 @@ export default function TopCVHomePage() {
     { id: 8, title: "Chuyên Viên Giải Phóng Mặt Bằng Thu Nhập Cao", company: "CÔNG TY CỔ PHẦN ĐẦU TƯ FECON", salary: "18 - 23 triệu", location: "Bắc Ninh" },
   ];
 
-  return (
-    <div style={{ backgroundColor: "#f4f6f9", minHeight: "100vh", fontFamily: "'Segoe UI', Roboto, sans-serif", color: "#334155" }}>
-      
-      {/* SECTION 1: HERO SEARCH BACKGROUND (MÀU XANH ĐẬM ĐẶC TRƯNG TOPCV) */}
-      <div style={{ background: "linear-gradient(180deg, #004d33 0%, #006644 100%)", padding: "40px 20px 60px 20px", textAlign: "center" }}>
-        <h1 style={{ color: "#ffffff", fontSize: "24px", fontWeight: "700", marginBottom: "8px", margin: 0 }}>
-          Tìm việc làm nhanh 24h, việc làm mới nhất trên toàn quốc
-        </h1>
-        <p style={{ color: "#a7f3d0", fontSize: "14px", marginBottom: "24px", marginTop: 0 }}>
-          Tiếp cận 80.000+ tin tuyển dụng việc làm mới mỗi ngày từ hàng nghìn doanh nghiệp uy tín tại Việt Nam
-        </p>
+  const categories = [
+    "Kinh doanh / Bán hàng",
+    "Marketing / PR / Quảng cáo",
+    "Chăm sóc khách hàng",
+    "Nhân sự / Hành chính",
+    "Công nghệ Thông tin",
+    "Lao động phổ thông"
+  ];
 
-        {/* THANH TÌM KIẾM BAO GỒM CÁC Ô LỰC CHỌN */}
-        <div style={{ maxWidth: "940px", margin: "0 auto", backgroundColor: "#ffffff", padding: "8px", borderRadius: "32px", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)" }}>
-          
+  return (
+    <div style={styles.pageWrapper}>
+      
+      {/* SECTION 1: HERO SEARCH */}
+      <div style={styles.heroSection}>
+        <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+          <h1 style={styles.heroTitle}>
+            Tìm việc làm nhanh 24h, việc làm mới nhất trên toàn quốc
+          </h1>
+          <p style={styles.heroSubtitle}>
+            Tiếp cận 80.000+ tin tuyển dụng việc làm mới mỗi ngày từ hàng nghìn doanh nghiệp uy tín
+          </p>
+        </div>
+
+        {/* SEARCH BAR */}
+        <div style={styles.searchBarContainer}>
           {/* Ô nhập từ khóa */}
-          <div style={{ flex: 2, display: "flex", alignItems: "center", paddingLeft: "16px" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="#94a3b8" style={{ width: "18px", height: "18px", marginRight: "8px" }}>
+          <div style={styles.searchInputGroup}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="#94a3b8" style={{ width: "20px", height: "20px", marginRight: "10px", flexShrink: 0 }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.601Z" />
             </svg>
             <input 
@@ -43,23 +55,28 @@ export default function TopCVHomePage() {
               placeholder="Vị trí tuyển dụng, tên công ty..." 
               value={searchTitle}
               onChange={(e) => setSearchTitle(e.target.value)}
-              style={{ width: "100%", border: "none", outline: "none", fontSize: "14px", color: "#1e293b" }}
+              style={styles.searchInput}
             />
           </div>
 
-          {/* Ngăn cách vạch đứng */}
-          <div style={{ width: "1px", height: "24px", backgroundColor: "#e2e8f0" }}></div>
+          <div style={styles.divider}></div>
 
           {/* Chọn địa điểm */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", cursor: "pointer" }}>
-            <span style={{ fontSize: "14px", color: "#475569" }}>Tất cả địa điểm</span>
+          <div style={styles.locationSelector}>
+            <span style={{ fontSize: "14px", color: "#334155", fontWeight: "500" }}>Tất cả địa điểm</span>
             <span style={{ fontSize: "10px", color: "#64748b" }}>▼</span>
           </div>
 
-          {/* Nút Tìm Kiếm màu xanh lá */}
-          <button style={{ backgroundColor: "#00b14f", color: "#ffffff", border: "none", padding: "10px 28px", borderRadius: "24px", fontWeight: "600", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", transition: "background 0.2s" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#009843")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#00b14f")}>
+          {/* Nút Tìm Kiếm */}
+          <button 
+            onMouseEnter={() => setIsSearchBtnHovered(true)}
+            onMouseLeave={() => setIsSearchBtnHovered(false)}
+            style={{
+              ...styles.searchButton,
+              backgroundColor: isSearchBtnHovered ? "#059669" : "#10b981",
+              boxShadow: isSearchBtnHovered ? "0 6px 16px rgba(16, 185, 129, 0.4)" : "none"
+            }}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: "16px", height: "16px" }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.601Z" />
             </svg>
@@ -68,86 +85,344 @@ export default function TopCVHomePage() {
         </div>
       </div>
 
-      {/* SECTION 2: GRID NỘI DUNG (BANNER CHẠY + DANH MỤC NGÀNH NGHỀ) */}
-      <div style={{ maxWidth: "1200px", margin: "-30px auto 40px auto", padding: "0 20px", display: "grid", gridTemplateColumns: "1fr 3fr", gap: "20px" }}>
+      {/* SECTION 2: CATEGORIES & BANNER */}
+      <div style={styles.contentGrid}>
         
-        {/* Menu danh mục bên trái */}
-        <div style={{ backgroundColor: "#ffffff", borderRadius: "12px", padding: "12px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }}>
-          {["Kinh doanh / Bán hàng", "Marketing / PR / Quảng cáo", "Chăm sóc khách hàng", "Nhân sự / Hành chính", "Công nghệ Thông tin", "Lao động phổ thông"].map((item, idx) => (
-            <div key={idx} style={{ padding: "12px 16px", fontSize: "13px", fontWeight: "600", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", cursor: "pointer", borderRadius: "6px" }}
-                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0fdf4")}
-                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
-              <span>{item}</span>
-              <span style={{ color: "#94a3b8" }}>❯</span>
-            </div>
-          ))}
+        {/* Menu danh mục */}
+        <div style={styles.categoryCard}>
+          {categories.map((item, idx) => {
+            const isCatHovered = hoveredCat === idx;
+            return (
+              <div 
+                key={idx} 
+                onMouseEnter={() => setHoveredCat(idx)}
+                onMouseLeave={() => setHoveredCat(null)}
+                style={{
+                  ...styles.categoryItem,
+                  backgroundColor: isCatHovered ? "#f0fdf4" : "transparent",
+                  color: isCatHovered ? "#059669" : "#334155",
+                }}
+              >
+                <span>{item}</span>
+                <span style={{ color: isCatHovered ? "#059669" : "#cbd5e1", fontSize: "12px", transition: "transform 0.2s" }}>❯</span>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Khu vực Banner quảng cáo lớn bên phải */}
-        <div style={{ position: "relative", backgroundColor: "#fff", borderRadius: "12px", overflow: "hidden", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", height: "294px", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(90deg, #e0f2fe 0%, #f0fdf4 100%)" }}>
-          <div style={{ textAlign: "center", padding: "20px" }}>
-            <span style={{ background: "#00b14f", color: "#fff", padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" }}>TIN TIÊU BIỂU</span>
-            <h2 style={{ fontSize: "28px", color: "#0f172a", fontWeight: "800", marginTop: "12px" }}>TUYỂN DỤNG TOÀN QUỐC 2026</h2>
-            <p style={{ color: "#475569" }}>Cơ hội gia nhập tập đoàn tài chính hàng đầu với mức thu nhập vượt trội &gt; 30 Triệu/Tháng</p>
-            <button style={{ background: "#0f172a", color: "#fff", border: "none", padding: "10px 24px", borderRadius: "8px", fontWeight: "600", cursor: "pointer", marginTop: "10px" }}>Ứng tuyển ngay</button>
+        {/* Banner tiêu điểm */}
+        <div style={styles.bannerCard}>
+          <div style={{ textAlign: "center", padding: "32px", maxWidth: "600px" }}>
+            <span style={styles.bannerTag}>TIN TIÊU BIỂU</span>
+            <h2 style={styles.bannerTitle}>TUYỂN DỤNG TOÀN QUỐC 2026</h2>
+            <p style={styles.bannerDesc}>Cơ hội gia nhập tập đoàn tài chính hàng đầu với mức thu nhập vượt trội &gt; 30 Triệu/Tháng</p>
+            <button style={styles.bannerBtn}>Ứng tuyển ngay</button>
           </div>
         </div>
       </div>
 
-      {/* SECTION 3: DANH SÁCH VIỆC LÀM TỐT NHẤT (HOT JOBS) */}
-      <div style={{ maxWidth: "1200px", margin: "0 auto 60px auto", padding: "0 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px" }}>
-          <div style={{ width: "4px", height: "24px", backgroundColor: "#00b14f", borderRadius: "2px" }}></div>
-          <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#1e293b", margin: 0 }}>Việc làm tốt nhất</h2>
-          <span style={{ backgroundColor: "#e0fdf4", color: "#00b14f", fontSize: "11px", fontWeight: "700", padding: "2px 8px", borderRadius: "4px" }}>TOPPY AI GỢI Ý</span>
+      {/* SECTION 3: HOT JOBS */}
+      <div style={styles.jobsSection}>
+        <div style={styles.sectionHeader}>
+          <div style={styles.headerIndicator}></div>
+          <h2 style={styles.sectionTitle}>Việc làm tốt nhất</h2>
+          <span style={styles.aiBadge}>TOPPY AI GỢI Ý</span>
         </div>
 
-        {/* GRID CHỨA BÀI ĐĂNG VIỆC LÀM (2 CỘT HOẶC 3 CỘT) */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
-          {hotJobs.map((job) => (
-            <div 
-              key={job.id}
-              onMouseEnter={() => setHoveredJob(job.id)}
-              onMouseLeave={() => setHoveredJob(null)}
-              style={{ 
-                backgroundColor: "#ffffff", 
-                padding: "16px", 
-                borderRadius: "12px", 
-                boxShadow: hoveredJob === job.id ? "0 10px 15px -3px rgba(0, 177, 79, 0.15)" : "0 4px 6px -1px rgba(0,0,0,0.03)", 
-                border: hoveredJob === job.id ? "1px solid #00b14f" : "1px solid #e2e8f0",
-                transition: "all 0.2s ease",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                height: "140px"
-              }}
-            >
-              <div>
-                {/* Tiêu đề công việc */}
-                <h3 style={{ fontSize: "14px", fontWeight: "600", color: hoveredJob === job.id ? "#00b14f" : "#1e293b", margin: "0 0 6px 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.4" }}>
-                  {job.title}
-                </h3>
-                {/* Tên doanh nghiệp */}
-                <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 12px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {job.company}
-                </p>
-              </div>
+        {/* GRID JOB CARDS */}
+        <div style={styles.jobsGrid}>
+          {hotJobs.map((job) => {
+            const isHovered = hoveredJob === job.id;
+            return (
+              <div 
+                key={job.id}
+                onMouseEnter={() => setHoveredJob(job.id)}
+                onMouseLeave={() => setHoveredJob(null)}
+                style={{
+                  ...styles.jobCard,
+                  borderColor: isHovered ? "#10b981" : "#f1f5f9",
+                  boxShadow: isHovered 
+                    ? "0 12px 20px -5px rgba(16, 185, 129, 0.15), 0 4px 6px -2px rgba(0,0,0,0.02)" 
+                    : "0 2px 4px rgba(0,0,0,0.02)",
+                  transform: isHovered ? "translateY(-2px)" : "translateY(0)"
+                }}
+              >
+                <div>
+                  <h3 style={{
+                    ...styles.jobTitle,
+                    color: isHovered ? "#059669" : "#0f172a"
+                  }}>
+                    {job.title}
+                  </h3>
+                  <p style={styles.companyName}>
+                    {job.company}
+                  </p>
+                </div>
 
-              {/* Phần chân của Thẻ chứa lương và địa điểm */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
-                <span style={{ color: "#00b14f", fontWeight: "700", backgroundColor: "#f0fdf4", padding: "4px 8px", borderRadius: "4px" }}>
-                  {job.salary}
-                </span>
-                <span style={{ color: "#64748b", backgroundColor: "#f1f5f9", padding: "4px 8px", borderRadius: "4px" }}>
-                  {job.location}
-                </span>
+                <div style={styles.jobCardFooter}>
+                  <span style={styles.salaryBadge}>
+                    {job.salary}
+                  </span>
+                  <span style={styles.locationBadge}>
+                    {job.location}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
     </div>
   );
 }
+
+// 📦 BỘ STYLES CHUẨN MODERN UI
+const styles = {
+  pageWrapper: {
+    backgroundColor: "#f8fafc",
+    minHeight: "100vh",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    color: "#334155",
+    paddingBottom: "60px",
+  },
+  heroSection: {
+    background: "linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%)",
+    padding: "50px 20px 80px 20px",
+    textAlign: "center" as const,
+  },
+  heroTitle: {
+    color: "#ffffff",
+    fontSize: "28px",
+    fontWeight: "800",
+    marginBottom: "10px",
+    marginTop: 0,
+    letterSpacing: "-0.5px",
+    lineHeight: "1.3",
+  },
+  heroSubtitle: {
+    color: "#a7f3d0",
+    fontSize: "15px",
+    marginBottom: "32px",
+    marginTop: 0,
+    fontWeight: "400",
+  },
+  searchBarContainer: {
+    maxWidth: "960px",
+    margin: "0 auto",
+    backgroundColor: "#ffffff",
+    padding: "6px 8px 6px 16px",
+    borderRadius: "99px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+  },
+  searchInputGroup: {
+    flex: 2,
+    display: "flex",
+    alignItems: "center",
+  },
+  searchInput: {
+    width: "100%",
+    border: "none",
+    outline: "none",
+    fontSize: "14px",
+    color: "#0f172a",
+    fontWeight: "500",
+    backgroundColor: "transparent",
+  },
+  divider: {
+    width: "1px",
+    height: "28px",
+    backgroundColor: "#e2e8f0",
+  },
+  locationSelector: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 12px",
+    cursor: "pointer",
+  },
+  searchButton: {
+    color: "#ffffff",
+    border: "none",
+    padding: "12px 32px",
+    borderRadius: "99px",
+    fontWeight: "600",
+    fontSize: "14px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+  },
+  contentGrid: {
+    maxWidth: "1200px",
+    margin: "-40px auto 40px auto",
+    padding: "0 20px",
+    display: "grid",
+    gridTemplateColumns: "280px 1fr",
+    gap: "20px",
+  },
+  categoryCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: "16px",
+    padding: "12px",
+    boxShadow: "0 10px 15px -3px rgba(15, 23, 42, 0.05)",
+    border: "1px solid #f1f5f9",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "4px",
+  },
+  categoryItem: {
+    padding: "12px 14px",
+    fontSize: "13.5px",
+    fontWeight: "600",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+    borderRadius: "10px",
+    transition: "all 0.15s ease",
+  },
+  bannerCard: {
+    position: "relative" as const,
+    backgroundColor: "#ffffff",
+    borderRadius: "16px",
+    overflow: "hidden",
+    boxShadow: "0 10px 15px -3px rgba(15, 23, 42, 0.05)",
+    border: "1px solid #f1f5f9",
+    height: "300px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%)",
+  },
+  bannerTag: {
+    background: "#10b981",
+    color: "#ffffff",
+    padding: "4px 14px",
+    borderRadius: "99px",
+    fontSize: "11px",
+    fontWeight: "700",
+    letterSpacing: "0.5px",
+  },
+  bannerTitle: {
+    fontSize: "26px",
+    color: "#0f172a",
+    fontWeight: "800",
+    marginTop: "14px",
+    marginBottom: "8px",
+    letterSpacing: "-0.5px",
+  },
+  bannerDesc: {
+    color: "#475569",
+    fontSize: "14px",
+    lineHeight: "1.5",
+    marginBottom: "18px",
+  },
+  bannerBtn: {
+    background: "#0f172a",
+    color: "#ffffff",
+    border: "none",
+    padding: "12px 28px",
+    borderRadius: "10px",
+    fontWeight: "600",
+    fontSize: "14px",
+    cursor: "pointer",
+    boxShadow: "0 4px 6px -1px rgba(15, 23, 42, 0.2)",
+  },
+  jobsSection: {
+    maxWidth: "1200px",
+    margin: "0 auto",
+    padding: "0 20px",
+  },
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    marginBottom: "24px",
+  },
+  headerIndicator: {
+    width: "4px",
+    height: "22px",
+    backgroundColor: "#10b981",
+    borderRadius: "99px",
+  },
+  sectionTitle: {
+    fontSize: "22px",
+    fontWeight: "800",
+    color: "#0f172a",
+    margin: 0,
+    letterSpacing: "-0.3px",
+  },
+  aiBadge: {
+    backgroundColor: "#ecfdf5",
+    color: "#059669",
+    fontSize: "11px",
+    fontWeight: "700",
+    padding: "3px 10px",
+    borderRadius: "6px",
+    border: "1px solid #a7f3d0",
+  },
+  jobsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))",
+    gap: "18px",
+  },
+  jobCard: {
+    backgroundColor: "#ffffff",
+    padding: "18px",
+    borderRadius: "16px",
+    border: "1px solid #f1f5f9",
+    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column" as const,
+    justifyContent: "space-between",
+    height: "150px",
+    boxSizing: "border-box" as const,
+  },
+  jobTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    margin: "0 0 6px 0",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical" as const,
+    overflow: "hidden",
+    lineHeight: "1.4",
+    transition: "color 0.2s ease",
+  },
+  companyName: {
+    fontSize: "12.5px",
+    color: "#64748b",
+    margin: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  jobCardFooter: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontSize: "12px",
+    marginTop: "12px",
+  },
+  salaryBadge: {
+    color: "#059669",
+    fontWeight: "700",
+    backgroundColor: "#ecfdf5",
+    padding: "4px 10px",
+    borderRadius: "6px",
+  },
+  locationBadge: {
+    color: "#475569",
+    backgroundColor: "#f1f5f9",
+    padding: "4px 10px",
+    borderRadius: "6px",
+    fontWeight: "500",
+  },
+};

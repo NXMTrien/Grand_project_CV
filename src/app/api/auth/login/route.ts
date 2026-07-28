@@ -37,6 +37,7 @@ export async function POST(req: Request) {
       message: "Đăng nhập thành công!",
       token,
       user: {
+        userId: user._id,
         fullName: user.fullName,
         role: user.role
       }

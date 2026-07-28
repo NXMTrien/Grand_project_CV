@@ -1,4 +1,7 @@
 import mongoose, { Schema, model, models } from "mongoose";
+import Company from "@/src/models/Company";
+import Category from "@/src/models/Category";
+import User from "@/src/models/User";
 
 const JobSchema = new Schema(
   {

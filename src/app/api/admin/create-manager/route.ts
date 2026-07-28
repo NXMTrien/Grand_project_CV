@@ -3,6 +3,7 @@ import connectDB from "@/src/lib/mongodb";
 import User from "@/src/models/User";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
@@ -17,23 +18,43 @@ const transporter = nodemailer.createTransport({
 export async function POST(req: Request) {
   try {
     await connectDB();
-    
-    // 1. LẤY API KEY TỪ HEADER "x-admin-api-key"
-    const adminApiKey = req.headers.get("x-admin-api-key");
 
-    // Lấy API Key hệ thống cấu hình trong file .env.local 
-    // Nếu chưa cấu hình .env.local, mặc định sẽ dùng "GrandJobSecret2026" để test nhanh
-    const systemAdminKey = process.env.ADMIN_API_KEY || "GrandJobSecret2026";
+    // 1. LẤY TOKEN TỪ HEADER "Authorization: Bearer <token>"
+    const authHeader = req.headers.get("authorization");
 
-    // Kiểm tra tính hợp lệ của API Key gửi lên
-    if (!adminApiKey || adminApiKey !== systemAdminKey) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
-        { message: "Yêu cầu bị từ chối. API Key quản trị viên không hợp lệ hoặc thiếu!" }, 
+        { message: "Bạn cần đăng nhập để thực hiện chức năng này!" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    // 2. GIẢI MÃ TOKEN VÀ KIỂM TRA QUYỀN ADMIN TRONG DATABASE
+    let decoded: any;
+    try {
+      const jwtSecret = process.env.JWT_SECRET || "your_fallback_jwt_secret";
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (err) {
+      return NextResponse.json(
+        { message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!" },
+        { status: 401 }
+      );
+    }
+
+    // Tìm thông tin người dùng gửi yêu cầu
+    const adminUser = await User.findById(decoded.id || decoded.userId);
+
+    // Kiểm tra tài khoản có tồn tại và có quyền ADMIN hay không
+    if (!adminUser || adminUser.role !== "ADMIN") {
+      return NextResponse.json(
+        { message: "Quyền truy cập bị từ chối. Chỉ Admin mới có quyền tạo tài khoản Manager!" },
         { status: 403 }
       );
     }
 
-    // 2. ĐỌC DỮ LIỆU TỪ BODY (Không cần adminId nữa)
+    // 3. ĐỌC DỮ LIỆU TỪ BODY
     const { email, fullName, dateOfBirth, companyId } = await req.json();
 
     // Kiểm tra thông tin bắt buộc
@@ -41,17 +62,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Thiếu thông tin bắt buộc" }, { status: 400 });
     }
 
-    // 3. KIỂM TRA TÀI KHOẢN TỒN TẠI CHƯA
+    // 4. KIỂM TRA TÀI KHOẢN TỒN TẠI CHƯA
     const userExists = await User.findOne({ email });
     if (userExists) {
       return NextResponse.json({ message: "Email này đã được sử dụng trên hệ thống" }, { status: 400 });
     }
 
-    // 4. TẠO MẬT KHẨU NGẪU NHIÊN VÀ HASH
-    const randomPassword = Math.random().toString(36).slice(-8) + "A1!"; 
+    // 5. TẠO MẬT KHẨU NGẪU NHIÊN VÀ HASH
+    const randomPassword = Math.random().toString(36).slice(-8) + "A1!";
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
-    // 5. LƯU VÀO DATABASE VỚI QUYỀN MANAGER
+    // 6. LƯU VÀO DATABASE VỚI QUYỀN MANAGER
     const newManager = await User.create({
       email,
       password: hashedPassword,
@@ -59,10 +80,10 @@ export async function POST(req: Request) {
       dateOfBirth: new Date(dateOfBirth),
       role: "MANAGER",
       companyId: companyId || null,
-      isVerified: true 
+      isVerified: true,
     });
 
-    // 6. GỬI EMAIL THÔNG BÁO CẤP TÀI KHOẢN
+    // 7. GỬI EMAIL THÔNG BÁO CẤP TÀI KHOẢN
     try {
       await transporter.sendMail({
         from: `"GrandJob Admin" <${process.env.EMAIL_USER}>`,
@@ -90,11 +111,13 @@ export async function POST(req: Request) {
       console.error("Lỗi gửi email cấp tài khoản:", mailError);
     }
 
-    return NextResponse.json({
-      message: "Cấp tài khoản Manager thành công và đã gửi mail thông báo!",
-      managerId: newManager._id
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        message: "Cấp tài khoản Manager thành công và đã gửi mail thông báo!",
+        managerId: newManager._id,
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
   }

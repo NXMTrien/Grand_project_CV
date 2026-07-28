@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
+import { getAuthPayload } from "@/src/lib/auth";
 import Resume from "@/src/models/Resume";
 import User from "@/src/models/User";
 
@@ -7,11 +8,16 @@ export async function POST(req: Request) {
   try {
     await connectDB();
 
-    // 1. Lấy ID Ứng viên từ Header
-    const candidateId = req.headers.get("x-candidate-id");
+    // 1. Lấy ID Ứng viên từ Header x-candidate-id hoặc JWT Bearer
+    let candidateId: string | null = req.headers.get("x-candidate-id");
+    if (!candidateId) {
+      const auth = getAuthPayload(req.headers);
+      candidateId = auth?.role === "CANDIDATE" && auth.userId ? auth.userId : null;
+    }
+
     if (!candidateId) {
       return NextResponse.json(
-        { message: "Yêu cầu bị từ chối. Thiếu thông tin định danh Ứng viên (x-candidate-id)!" },
+        { message: "Yêu cầu bị từ chối. Thiếu thông tin định danh Ứng viên (x-candidate-id) hoặc token hợp lệ!" },
         { status: 401 }
       );
     }
@@ -32,12 +38,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Vui lòng nhập tiêu đề CV (title)" }, { status: 400 });
     }
 
-    // Chuẩn hóa cấu trúc cvData từ body để khớp với lồng ghép Schema của bạn
+    // Chuẩn hóa cấu trúc cvData từ body để phù hợp với frontend hiện tại
     const formattedCvData = {
+      fullName: cvData?.fullName || "",
+      avatar: cvData?.avatar || "",
+      phone: cvData?.phone || "",
+      email: cvData?.email || "",
+      address: cvData?.address || "",
+      targetPosition: cvData?.targetPosition || "",
       summary: cvData?.summary || "",
-      education: Array.isArray(cvData?.education) ? cvData.education : [],
-      experience: Array.isArray(cvData?.experience) ? cvData.experience : [],
-      skills: Array.isArray(cvData?.skills) ? cvData.skills : [],
+      technicalSkills: cvData?.technicalSkills || "",
+      softSkills: cvData?.softSkills || "",
+      education: Array.isArray(cvData?.education) ? cvData.education : cvData?.education ? [cvData.education] : [],
+      experience: Array.isArray(cvData?.experience) ? cvData.experience : cvData?.experience ? [cvData.experience] : [],
+      skills: Array.isArray(cvData?.skills)
+        ? cvData.skills
+        : typeof cvData?.technicalSkills === "string"
+        ? cvData.technicalSkills.split(",").map((skill: string) => skill.trim()).filter(Boolean)
+        : [],
       projects: Array.isArray(cvData?.projects) ? cvData.projects : []
     };
 
