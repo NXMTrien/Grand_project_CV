@@ -1,81 +1,109 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
 import Category from "@/src/models/Category";
+import jwt from "jsonwebtoken";
 
-// Hàm tiện ích để tự động tạo slug từ tên Tiếng Việt (Ví dụ: "Công Nghệ Thông Tin" -> "cong-nghe-thong-tin")
+// Hàm tiện ích tạo slug từ tên Tiếng Việt
 function slugify(text: string) {
   return text
     .toString()
-    .normalize("NFD")                   // Tách các dấu chữ cái tiếng Việt
-    .replace(/[\u0300-\u036f]/g, "")    // Xóa các ký tự dấu vừa tách
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, "-")               // Thay thế khoảng trắng bằng dấu gạch ngang
-    .replace(/[^\w\-]+/g, "")           // Xóa tất cả các ký tự đặc biệt khác trừ từ ngữ và gạch ngang
-    .replace(/\-\-+/g, "-");            // Thay thế nhiều dấu gạch ngang liên tiếp bằng 1 dấu
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\-]+/g, "")
+    .replace(/\-\-+/g, "-");
 }
 
 export async function POST(req: Request) {
   try {
     await connectDB();
 
-    // 1. Kiểm tra API Key của Admin từ Header
-    const adminApiKey = req.headers.get("x-admin-api-key");
-    const systemAdminKey = process.env.ADMIN_API_KEY || "GrandJobSecret2026";
-
-    if (!adminApiKey || adminApiKey !== systemAdminKey) {
+    // 1. Kiểm tra Token từ Header Authorization (Bearer <token>)
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
-        { message: "Yêu cầu bị từ chối. Bạn không có quyền ADMIN để tạo danh mục!" },
+        { message: "Yêu cầu bị từ chối. Vui lòng đăng nhập lại!" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split(" ")[1];
+    let decoded: any;
+
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || "YourSecretKey");
+    } catch (err) {
+      return NextResponse.json(
+        { message: "Token không hợp lệ hoặc đã hết hạn!" },
+        { status: 401 }
+      );
+    }
+
+    // Kiểm tra quyền ADMIN từ payload của Token
+    if (decoded?.role?.toUpperCase() !== "ADMIN") {
+      return NextResponse.json(
+        { message: "Bạn không có quyền ADMIN để tạo danh mục!" },
         { status: 403 }
       );
     }
 
-    // 2. Đọc thông tin từ body theo đúng Schema
+    // 2. Đọc thông tin từ body
     const { name, skills } = await req.json();
 
-    if (!name) {
-      return NextResponse.json({ message: "Tên danh mục ngành nghề (name) là bắt buộc" }, { status: 400 });
+    if (!name || !name.trim()) {
+      return NextResponse.json(
+        { message: "Tên danh mục ngành nghề (name) là bắt buộc" },
+        { status: 400 }
+      );
     }
 
-    // Tự động tạo slug từ name để thỏa mãn Schema
     const slug = slugify(name);
 
-    // 3. Kiểm tra xem danh mục hoặc slug này đã tồn tại chưa (Tránh trùng lập)
-    const categoryExists = await Category.findOne({ 
-      $or: [{ name }, { slug }] 
+    // 3. Kiểm tra xem danh mục hoặc slug đã tồn tại chưa
+    const categoryExists = await Category.findOne({
+      $or: [{ name: name.trim() }, { slug }],
     });
-    
+
     if (categoryExists) {
       return NextResponse.json(
-        { message: "Danh mục ngành nghề hoặc đường dẫn (slug) này đã tồn tại trên hệ thống" }, 
+        { message: "Danh mục ngành nghề hoặc đường dẫn (slug) này đã tồn tại!" },
         { status: 400 }
       );
     }
 
     // 4. Lưu danh mục mới vào MongoDB
     const newCategory = await Category.create({
-      name,
+      name: name.trim(),
       slug,
-      skills: Array.isArray(skills) ? skills : [] // Đảm bảo skills luôn là một mảng chuỗi
+      skills: Array.isArray(skills)
+        ? skills.map((s) => s.trim()).filter(Boolean)
+        : [],
     });
 
     return NextResponse.json(
       { message: "Tạo danh mục ngành nghề thành công!", category: newCategory },
       { status: 201 }
     );
-
   } catch (error: any) {
-    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { message: "Lỗi Server", error: error.message },
+      { status: 500 }
+    );
   }
 }
 
-// API GET: Lấy toàn bộ danh sách ngành nghề đổ ra giao diện
+// API GET: Lấy toàn bộ danh sách ngành nghề
 export async function GET() {
   try {
     await connectDB();
-    const categories = await Category.find({});
+    const categories = await Category.find({}).sort({ createdAt: -1 });
     return NextResponse.json(categories, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { message: "Lỗi Server", error: error.message },
+      { status: 500 }
+    );
   }
 }

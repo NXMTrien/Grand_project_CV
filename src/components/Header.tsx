@@ -176,7 +176,7 @@ export default function Header() {
                 }}
               >
                 <div style={navLinkStyle("admin-users")}>
-                  <span>Quản lý Người dùng</span>
+                  <span>Quản lý</span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
@@ -251,21 +251,45 @@ export default function Header() {
                         e.currentTarget.style.color = "#334155";
                       }}
                     >
-                      Quản lý Manager
+                      Thêm Mới Manager
+                    </Link>
+                    
+                    <Link
+                      href="/admin-panel/categories"
+                      style={{
+                        display: "block",
+                        padding: "8px 16px",
+                        fontSize: "13px",
+                        fontWeight: "500",
+                        color: "#334155",
+                        textDecoration: "none",
+                        transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f0fdf4";
+                        e.currentTarget.style.color = "#10b981";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "#334155";
+                      }}
+                    >
+                      Quản lý Danh Mục 
                     </Link>
                   </div>
                 )}
               </div>
 
               <Link
-                href="/admin/companies"
+                href="/admin-panel/companies"
                 id="admin-companies"
                 onMouseEnter={() => setHoveredLink("admin-companies")}
                 onMouseLeave={() => setHoveredLink(null)}
                 style={navLinkStyle("admin-companies")}
               >
-                Quản lý Công ty
+                Quản lý Công Ty
               </Link>
+              
             </>
           )}
 
@@ -273,16 +297,7 @@ export default function Header() {
           {isManagerOrHR && (
             <>
               <Link
-                href="/hr/jobs"
-                id="hr-jobs"
-                onMouseEnter={() => setHoveredLink("hr-jobs")}
-                onMouseLeave={() => setHoveredLink(null)}
-                style={navLinkStyle("hr-jobs")}
-              >
-                Công việc
-              </Link>
-              <Link
-                href="/hr/jobs/create"
+                href="/jobs/create"
                 id="hr-create-job"
                 onMouseEnter={() => setHoveredLink("hr-create-job")}
                 onMouseLeave={() => setHoveredLink(null)}
@@ -291,7 +306,7 @@ export default function Header() {
                 Tạo công việc
               </Link>
               <Link
-                href="/hr/company"
+                href="/create_company"
                 id="hr-company"
                 onMouseEnter={() => setHoveredLink("hr-company")}
                 onMouseLeave={() => setHoveredLink(null)}
@@ -300,7 +315,7 @@ export default function Header() {
                 Công ty
               </Link>
               <Link
-                href="/hr/applicants"
+                href="applications"
                 id="hr-applicants"
                 onMouseEnter={() => setHoveredLink("hr-applicants")}
                 onMouseLeave={() => setHoveredLink(null)}
@@ -452,7 +467,7 @@ export default function Header() {
                     Trang cá nhân
                   </Link>
 
-                  {/* Link Tạo công ty mới (Chỉ hiện cho Manager / HR / Company) */}
+                  {/* Link Tạo công ty mới (Chỉ hiện cho Manager / HR / Company)
                   {isManagerOrHR && (
                     <Link
                       href="/hr/company/create"
@@ -482,7 +497,7 @@ export default function Header() {
                       </svg>
                       Tạo công ty mới
                     </Link>
-                  )}
+                  )} */}
 
                   {/* Nút Đăng xuất */}
                   <button

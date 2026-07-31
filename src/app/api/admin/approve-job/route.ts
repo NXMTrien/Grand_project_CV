@@ -1,58 +1,100 @@
+// app/api/admin/jobs/route.ts (hoặc đường dẫn API duyệt tin của bạn)
 import { NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 import connectDB from "@/src/lib/mongodb";
 import Job from "@/src/models/Job";
+
+interface JwtPayload {
+  userId: string;
+  role: string;
+}
 
 export async function PUT(req: Request) {
   try {
     await connectDB();
 
-    // 1. Kiểm tra API Key của Admin từ Header để phân quyền
-    const adminApiKey = req.headers.get("x-admin-api-key");
-    const systemAdminKey = process.env.ADMIN_API_KEY || "GrandJobSecret2026";
-
-    if (!adminApiKey || adminApiKey !== systemAdminKey) {
+    // 1. Lấy Bearer Token từ Header Authorization (gửi từ localStorage của Frontend)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
-        { message: "Yêu cầu bị từ chối. Bạn không có quyền ADMIN để kiểm duyệt tin!" },
+        { message: "Yêu cầu bị từ chối. Bạn chưa cung cấp Token đăng nhập!" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split(" ")[1];
+    const jwtSecret = process.env.JWT_SECRET || "YourSecretKeyHere";
+
+    // 2. Xác thực Token & Kiểm tra Quyền ADMIN
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(token, jwtSecret) as JwtPayload;
+    } catch (err) {
+      return NextResponse.json(
+        { message: "Token không hợp lệ hoặc đã hết hạn!" },
+        { status: 401 }
+      );
+    }
+
+    if (decoded.role !== "ADMIN") {
+      return NextResponse.json(
+        { message: "Bạn không có quyền ADMIN để thực hiện thao tác này!" },
         { status: 403 }
       );
     }
 
-    // 2. Đọc dữ liệu duyệt tin từ Body của Postman gửi lên
+    // 3. Đọc dữ liệu từ Body
     const { jobId, status } = await req.json();
 
     if (!jobId || !status) {
       return NextResponse.json(
-        { message: "Thiếu thông tin bắt buộc (jobId và status)" }, 
+        { message: "Thiếu thông tin bắt buộc (jobId và status)" },
         { status: 400 }
       );
     }
 
-    // 3. Kiểm tra trạng thái gửi lên có hợp lệ theo Schema không
+    // 4. Kiểm tra trạng thái hợp lệ
     const validStatuses = ["APPROVED", "REJECTED", "EXPIRED"];
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
-        { message: "Trạng thái kiểm duyệt không hợp lệ! Chỉ chấp nhận: APPROVED, REJECTED, EXPIRED." }, 
+        { message: "Trạng thái không hợp lệ! Chỉ chấp nhận: APPROVED, REJECTED, EXPIRED." },
         { status: 400 }
       );
     }
 
-    // 4. Tìm công việc trong DB và cập nhật trạng thái mới
+    // 5. Cập nhật vào DB
     const updatedJob = await Job.findByIdAndUpdate(
       jobId,
-      { status: status },
-      { new: true } // Trả về dữ liệu mới sau khi sửa đổi thành công
+      { status },
+      { new: true }
     );
 
     if (!updatedJob) {
       return NextResponse.json({ message: "Không tìm thấy tin tuyển dụng này!" }, { status: 404 });
     }
 
-    // 5. Phản hồi thành công
-    return NextResponse.json({
-      message: `Đã cập nhật trạng thái tin tuyển dụng thành: ${status}`,
-      job: updatedJob
-    }, { status: 200 });
+    return NextResponse.json(
+      {
+        message: `Đã cập nhật trạng thái tin tuyển dụng thành: ${status}`,
+        job: updatedJob,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
+  }
+}
+// Thêm hàm GET này vào chung file API ở trên
+export async function GET(req: Request) {
+  try {
+    await connectDB();
 
+    // Lấy tất cả tin có trạng thái PENDING (chưa xác thực)
+    const pendingJobs = await Job.find({ status: "PENDING" })
+      .populate("companyId", "name email") // Lấy thêm thông tin công ty nếu có ref
+      .sort({ createdAt: -1 });
+
+    return NextResponse.json({ data: pendingJobs }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
   }

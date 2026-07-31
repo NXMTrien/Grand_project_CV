@@ -10,40 +10,64 @@ export async function POST(req: Request) {
     const { email, password } = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json({ message: "Vui lòng nhập đầy đủ email và mật khẩu" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Vui lòng nhập đầy đủ email và mật khẩu" },
+        { status: 400 }
+      );
     }
 
-    // Tìm user theo email
+    // 1. Tìm user theo email
     const user = await User.findOne({ email });
     if (!user) {
-      return NextResponse.json({ message: "Tài khoản hoặc mật khẩu không chính xác" }, { status: 401 });
+      return NextResponse.json(
+        { message: "Tài khoản hoặc mật khẩu không chính xác" },
+        { status: 401 }
+      );
     }
 
-    // Kiểm tra mật khẩu
+    // 2. Kiểm tra mật khẩu
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
-      return NextResponse.json({ message: "Tài khoản hoặc mật khẩu không chính xác" }, { status: 401 });
+      return NextResponse.json(
+        { message: "Tài khoản hoặc mật khẩu không chính xác" },
+        { status: 401 }
+      );
     }
 
-    // Tạo JWT Token (Hết hạn sau 1 ngày)
+    // 3. KIỂM TRA TRẠNG THÁI KHÓA TÀI KHOẢN (isBlocked)
+    if (user.isBlocked) {
+      return NextResponse.json(
+        {
+          message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ QUẢN TRỊ VIÊN để yêu cầu mở khóa!",
+        },
+        { status: 403 } // HTTP 403 Forbidden
+      );
+    }
+
+    // 4. Tạo JWT Token (Hết hạn sau 1 ngày)
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       { expiresIn: "1d" }
     );
 
-    // Trả về thông tin danh tính và token cho frontend
-    return NextResponse.json({
-      message: "Đăng nhập thành công!",
-      token,
-      user: {
-        userId: user._id,
-        fullName: user.fullName,
-        role: user.role
-      }
-    }, { status: 200 });
-
+    // 5. Trả về thông tin danh tính và token cho frontend
+    return NextResponse.json(
+      {
+        message: "Đăng nhập thành công!",
+        token,
+        user: {
+          userId: user._id,
+          fullName: user.fullName,
+          role: user.role,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error: any) {
-    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { message: "Lỗi Server", error: error.message },
+      { status: 500 }
+    );
   }
 }

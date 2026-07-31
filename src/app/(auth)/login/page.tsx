@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const [isButtonHovered, setIsButtonHovered] = useState(false);
   const [isForgotHovered, setIsForgotHovered] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -29,12 +29,12 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      // 🔍 LOG DỮ LIỆU BẢNG BẮT ĐƯỢC TỪ API ĐỂ KIỂM TRA
       console.log("👉 Response từ API Login:", data);
 
+      // Nếu tài khoản bị khóa (status 403) hoặc sai mật khẩu (status 401),
+      // data.message từ backend sẽ được ném ra và hiển thị ở khung errorBox
       if (!res.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
-      // Bắt các trường hợp đặt tên Token khác nhau từ API
       const token = data.token || data.accessToken || data.data?.token;
       const user = data.user || data.data?.user;
 
@@ -43,16 +43,12 @@ export default function LoginPage() {
         throw new Error("Không nhận được mã xác thực (Token) từ hệ thống");
       }
 
-      // 💾 LƯU VÀO LOCALSTORAGE
+      // Lưu vào LocalStorage
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      // 🔍 VERIFY XEM ĐÃ LƯU THÀNH CÔNG CHƯA
-      console.log("✅ Đã lưu Token vào LocalStorage:", localStorage.getItem("token"));
-      console.log("✅ Đã lưu User vào LocalStorage:", localStorage.getItem("user"));
-
       alert(`Chào mừng quay trở lại, ${user?.fullName || user?.name || "Bạn"}!`);
-      
+
       // Chuyển hướng trang
       window.location.href = "/";
     } catch (err: any) {
@@ -83,19 +79,25 @@ export default function LoginPage() {
   return (
     <div style={styles.container}>
       <form onSubmit={handleLogin} style={styles.card}>
-        
         {/* LOGO & TIÊU ĐỀ */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <h2 style={styles.title}>
-            Đăng nhập <span style={{ color: "#0f172a" }}>{systemNameLeft}{systemNameRight}</span>
+            Đăng nhập{" "}
+            <span style={{ color: "#0f172a" }}>
+              {systemNameLeft}
+              {systemNameRight}
+            </span>
           </h2>
-          <p style={styles.subtitle}>Nhập thông tin tài khoản của bạn để tiếp tục</p>
+          <p style={styles.subtitle}>
+            Nhập thông tin tài khoản của bạn để tiếp tục
+          </p>
         </div>
 
-        {/* CẢNH BÁO LỖI */}
+        {/* CẢNH BÁO LỖI (Hiển thị khi sai pass hoặc khi bị KHÓA TÀI KHOẢN) */}
         {error && (
           <div style={styles.errorBox}>
-            <span style={{ marginRight: "6px" }}>⚠️</span> {error}
+            <span style={{ marginRight: "8px", flexShrink: 0 }}>⚠️</span>
+            <span>{error}</span>
           </div>
         )}
 
@@ -103,45 +105,45 @@ export default function LoginPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div>
             <label style={styles.label}>Địa chỉ Email</label>
-            <input 
-              type="email" 
-              required 
+            <input
+              type="email"
+              required
               placeholder="nhapemail@example.com"
               style={getInputStyle("email")}
-              value={email} 
+              value={email}
               onFocus={() => setFocusedField("email")}
               onBlur={() => setFocusedField(null)}
-              onChange={(e) => setEmail(e.target.value)} 
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div>
             <label style={styles.label}>Mật khẩu</label>
-            <input 
-              type="password" 
-              required 
+            <input
+              type="password"
+              required
               placeholder="••••••••"
               style={getInputStyle("password")}
-              value={password} 
+              value={password}
               onFocus={() => setFocusedField("password")}
               onBlur={() => setFocusedField(null)}
-              onChange={(e) => setPassword(e.target.value)} 
+              onChange={(e) => setPassword(e.target.value)}
             />
           </div>
         </div>
 
         {/* QUÊN MẬT KHẨU */}
         <div style={{ textAlign: "right", marginTop: "14px" }}>
-          <Link 
-            href="/forgot-password" 
+          <Link
+            href="/forgot-password"
             onMouseEnter={() => setIsForgotHovered(true)}
             onMouseLeave={() => setIsForgotHovered(false)}
-            style={{ 
-              fontSize: "13px", 
+            style={{
+              fontSize: "13px",
               fontWeight: "600",
-              color: isForgotHovered ? "#047857" : "#10b981", 
+              color: isForgotHovered ? "#047857" : "#10b981",
               textDecoration: "none",
-              transition: "color 0.2s" 
+              transition: "color 0.2s",
             }}
           >
             Quên mật khẩu?
@@ -149,31 +151,35 @@ export default function LoginPage() {
         </div>
 
         {/* NÚT SUBMIT */}
-        <button 
-          type="submit" 
-          disabled={loading} 
+        <button
+          type="submit"
+          disabled={loading}
           onMouseEnter={() => setIsButtonHovered(true)}
           onMouseLeave={() => setIsButtonHovered(false)}
-          style={{ 
-            width: "100%", 
-            marginTop: "28px", 
-            backgroundColor: loading ? "#cbd5e1" : (isButtonHovered ? "#059669" : "#10b981"), 
-            color: "#ffffff", 
-            padding: "14px", 
-            borderRadius: "10px", 
-            fontWeight: "600", 
-            fontSize: "15px", 
-            border: "none", 
-            cursor: loading ? "not-allowed" : "pointer", 
+          style={{
+            width: "100%",
+            marginTop: "28px",
+            backgroundColor: loading
+              ? "#cbd5e1"
+              : isButtonHovered
+              ? "#059669"
+              : "#10b981",
+            color: "#ffffff",
+            padding: "14px",
+            borderRadius: "10px",
+            fontWeight: "600",
+            fontSize: "15px",
+            border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
             transition: "all 0.2s ease",
-            boxShadow: isButtonHovered && !loading 
-              ? "0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -4px rgba(16, 185, 129, 0.2)" 
-              : "0 4px 6px -1px rgba(16, 185, 129, 0.1)"
+            boxShadow:
+              isButtonHovered && !loading
+                ? "0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -4px rgba(16, 185, 129, 0.2)"
+                : "0 4px 6px -1px rgba(16, 185, 129, 0.1)",
           }}
         >
           {loading ? "Đang xác thực..." : "Đăng nhập ngay"}
         </button>
-
       </form>
     </div>
   );
@@ -184,10 +190,11 @@ const styles = {
     display: "flex",
     minHeight: "100vh",
     alignItems: "center",
-    justify: "center",
+    justifyContent: "center", // Sửa từ 'justify' thành 'justifyContent'
     background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
     padding: "20px 16px",
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   },
   card: {
     width: "100%",
@@ -195,8 +202,10 @@ const styles = {
     backgroundColor: "#ffffff",
     padding: "40px 32px",
     borderRadius: "20px",
-    boxShadow: "0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02)",
+    boxShadow:
+      "0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02)",
     border: "1px solid #f1f5f9",
+    margin: "auto",
   },
   title: {
     fontSize: "26px",
@@ -228,5 +237,6 @@ const styles = {
     border: "1px solid #fee2e2",
     display: "flex",
     alignItems: "center",
+    lineHeight: "1.4",
   },
 };

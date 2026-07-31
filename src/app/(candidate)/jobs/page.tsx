@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // 👈 Thêm router
 
 interface JobItem {
   _id: string;
@@ -21,13 +22,18 @@ interface ResumeItem {
 }
 
 export default function JobsPage() {
+  const router = useRouter(); // 👈 Khởi tạo router
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedJob, setSelectedJob] = useState<JobItem | null>(null);
   const [myResumes, setMyResumes] = useState<ResumeItem[]>([]);
-  const [selectedResumeId, setSelectedResumeId] = useState("");
   const [isApplying, setIsApplying] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // STATE QUẢN LÝ MODAL & FORM ỨNG TUYỂN
+  const [applyJob, setApplyJob] = useState<JobItem | null>(null);
+  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [targetPosition, setTargetPosition] = useState("");
+  const [selfIntroduction, setSelfIntroduction] = useState("");
 
   useEffect(() => {
     fetchJobs();
@@ -39,10 +45,9 @@ export default function JobsPage() {
       const res = await fetch("/api/jobs");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Không tải được danh sách việc làm");
-      setJobs(data.data || []);
-      if ((data.data || []).length > 0) {
-        setSelectedJob(data.data[0]);
-      }
+      
+      const jobList = data.data || [];
+      setJobs(jobList);
     } catch (err: any) {
       setErrorMessage(err.message || "Lỗi khi tải việc làm");
     }
@@ -59,35 +64,62 @@ export default function JobsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Không tải được danh sách CV");
-      setMyResumes(data.data || []);
+      
+      const list = data.data || [];
+      setMyResumes(list);
+      if (list.length > 0) {
+        setSelectedResumeId(list[0]._id);
+      }
     } catch (err: any) {
       console.error("fetchResumes error", err);
     }
   };
 
-  const handleApply = async () => {
-    if (!selectedJob) return;
-    if (!selectedResumeId) {
-      alert("Vui lòng chọn 1 chiếc CV phù hợp để nộp bài!");
+  const handleOpenApplyModal = (job: JobItem) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Vui lòng đăng nhập trước khi ứng tuyển!");
       return;
     }
+
+    setApplyJob(job);
+    setTargetPosition(job.title || "");
+  };
+
+  const handleSubmitApply = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!applyJob) return;
+    if (!selectedResumeId) {
+      alert("Vui lòng chọn 1 chiếc CV phù hợp!");
+      return;
+    }
+
     setIsApplying(true);
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Vui lòng đăng nhập trước khi ứng tuyển");
 
-      const res = await fetch(`/api/jobs/${selectedJob._id}/apply`, {
+      const formattedCoverLetter = `Vị trí ứng tuyển: ${targetPosition}\n\nLời giới thiệu:\n${selfIntroduction}`;
+
+      const res = await fetch(`/api/jobs/${applyJob._id}/apply`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ resumeId: selectedResumeId }),
+        body: JSON.stringify({
+          resumeId: selectedResumeId,
+          coverLetter: formattedCoverLetter.trim(),
+        }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Ứng tuyển thất bại");
-      alert(data.message || "Ứng tuyển thành công");
-      setSelectedResumeId("");
+
+      alert(data.message || "Ứng tuyển thành công!");
+      setApplyJob(null);
+      setSelfIntroduction("");
     } catch (err: any) {
       alert(err.message || "Có lỗi xảy ra khi ứng tuyển");
     } finally {
@@ -113,7 +145,7 @@ export default function JobsPage() {
     >
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
         
-        {/* THANH TÌM KIẾM TỐI GIẢN */}
+        {/* THANH TÌM KIẾM */}
         <div
           style={{
             backgroundColor: "#ffffff",
@@ -178,263 +210,319 @@ export default function JobsPage() {
           </div>
         )}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-            gap: "24px",
-            alignItems: "start",
-          }}
-        >
-          {/* DANH SÁCH CÔNG VIỆC (CỘT TRÁI) */}
-          <div
+        <div style={{ marginBottom: "16px" }}>
+          <h2
             style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-              maxHeight: "82vh",
-              overflowY: "auto",
-              paddingRight: "4px",
+              fontSize: "12px",
+              fontWeight: "700",
+              color: "#94a3b8",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              margin: 0,
             }}
           >
-            <div style={{ paddingBottom: "4px", paddingLeft: "4px" }}>
-              <h2
-                style={{
-                  fontSize: "11px",
-                  fontWeight: "700",
-                  color: "#94a3b8",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  margin: 0,
-                }}
-              >
-                Cơ hội việc làm ({filteredJobs.length})
-              </h2>
-            </div>
+            Cơ hội việc làm ({filteredJobs.length})
+          </h2>
+        </div>
 
-            {filteredJobs.length === 0 ? (
-              <div
-                style={{
-                  backgroundColor: "#ffffff",
-                  borderRadius: "12px",
-                  border: "1px dashed #cbd5e1",
-                  padding: "32px",
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ color: "#475569", fontSize: "14px", fontWeight: "500", margin: 0 }}>
-                  Không tìm thấy công việc phù hợp
-                </p>
-                <p style={{ color: "#94a3b8", fontSize: "11px", marginTop: "4px", margin: 0 }}>
-                  Thử thay đổi từ khóa tìm kiếm của bạn xem sao
-                </p>
-              </div>
-            ) : (
-              filteredJobs.map((job) => {
-                const isSelected = selectedJob?._id === job._id;
-                return (
-                  <div
-                    key={job._id}
-                    onClick={() => setSelectedJob(job)}
-                    style={{
-                      padding: "14px",
-                      borderRadius: "12px",
-                      backgroundColor: "#ffffff",
-                      border: isSelected ? "1px solid #10b981" : "1px solid #e2e8f0",
-                      boxShadow: isSelected ? "0 0 0 1px #10b981" : "0 1px 2px rgba(0,0,0,0.02)",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: "700",
-                        color: isSelected ? "#059669" : "#1e293b",
-                        margin: 0,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {job.title}
-                    </h3>
-
-                    <p style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", marginBottom: 0, fontWeight: "500" }}>
-                      {job.companyId?.name || "Công ty chưa rõ"}
-                    </p>
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "10px", fontSize: "11px" }}>
-                      {/* Lương */}
-                      <span
-                        style={{
-                          color: "#047857",
-                          fontWeight: "600",
-                          backgroundColor: "#ecfdf5",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          border: "1px solid #a7f3d0",
-                        }}
-                      >
-                        {job.salaryMin && job.salaryMax ? `${job.salaryMin} - ${job.salaryMax} triệu` : "Thỏa thuận"}
-                      </span>
-
-                      {/* Địa điểm */}
-                      <span
-                        style={{
-                          color: "#475569",
-                          backgroundColor: "#f1f5f9",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        {job.location || "Chưa xác định"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* CHI TIẾT CÔNG VIỆC (CỘT PHẢI) */}
+        {/* DANH SÁCH CÔNG VIỆC */}
+        {filteredJobs.length === 0 ? (
           <div
             style={{
               backgroundColor: "#ffffff",
-              border: "1px solid #e2e8f0",
               borderRadius: "12px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-              padding: "24px",
-              position: "sticky",
-              top: "24px",
-              maxHeight: "85vh",
-              overflowY: "auto",
+              border: "1px dashed #cbd5e1",
+              padding: "48px 16px",
+              textAlign: "center",
             }}
           >
-            {selectedJob ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                
-                {/* Header công việc */}
-                <div style={{ borderBottom: "1px solid #f1f5f9", paddingBottom: "16px" }}>
-                  <span
+            <p style={{ color: "#475569", fontSize: "15px", fontWeight: "500", margin: 0 }}>
+              Không tìm thấy công việc phù hợp
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "20px",
+            }}
+          >
+            {filteredJobs.map((job) => (
+              <div
+                key={job._id}
+                style={{
+                  padding: "18px",
+                  borderRadius: "12px",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "14px",
+                }}
+              >
+                <div>
+                  <h3
                     style={{
-                      display: "inline-block",
-                      fontSize: "10px",
+                      fontSize: "16px",
                       fontWeight: "700",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "#059669",
-                      backgroundColor: "#ecfdf5",
-                      padding: "2px 8px",
-                      borderRadius: "4px",
-                      marginBottom: "8px",
+                      color: "#1e293b",
+                      margin: 0,
+                      lineHeight: 1.4,
                     }}
                   >
-                    Tuyển dụng trực tiếp
-                  </span>
-                  <h1 style={{ fontSize: "20px", fontWeight: "700", color: "#0f172a", margin: 0, lineHeight: 1.3 }}>
-                    {selectedJob.title}
-                  </h1>
-                  <p style={{ fontSize: "14px", fontWeight: "600", color: "#475569", marginTop: "4px", margin: 0 }}>
-                    {selectedJob.companyId?.name || "Công ty chưa rõ"}
+                    {job.title}
+                  </h3>
+
+                  <p style={{ fontSize: "13px", color: "#64748b", marginTop: "6px", marginBottom: 0, fontWeight: "500" }}>
+                    {job.companyId?.name || "Công ty chưa rõ"}
                   </p>
-                </div>
 
-                {/* Box nộp hồ sơ */}
-                <div
-                  style={{
-                    backgroundColor: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    padding: "16px",
-                    borderRadius: "12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
-                  }}
-                >
-                  <h3 style={{ fontWeight: "700", color: "#1e293b", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-                    Ứng tuyển công việc này
-                  </h3>
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                    <select
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px", fontSize: "12px" }}>
+                    <span
                       style={{
-                        flex: "1 1 200px",
-                        padding: "8px 12px",
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "8px",
-                        backgroundColor: "#ffffff",
-                        fontSize: "12px",
-                        color: "#334155",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                      value={selectedResumeId}
-                      onChange={(e) => setSelectedResumeId(e.target.value)}
-                    >
-                      <option value="">-- Chọn 1 CV từ tài khoản của bạn --</option>
-                      {myResumes.map((cv) => (
-                        <option key={cv._id} value={cv._id}>{cv.title}</option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={handleApply}
-                      disabled={isApplying}
-                      style={{
-                        backgroundColor: isApplying ? "#cbd5e1" : "#10b981",
-                        color: "#ffffff",
-                        padding: "8px 20px",
-                        borderRadius: "8px",
-                        fontWeight: "700",
-                        fontSize: "12px",
-                        border: "none",
-                        cursor: isApplying ? "not-allowed" : "pointer",
-                        whiteSpace: "nowrap",
-                        boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
+                        color: "#047857",
+                        fontWeight: "600",
+                        backgroundColor: "#ecfdf5",
+                        padding: "3px 10px",
+                        borderRadius: "6px",
+                        border: "1px solid #a7f3d0",
                       }}
                     >
-                      {isApplying ? "Đang gửi..." : "Ứng tuyển ngay"}
-                    </button>
+                      {job.salaryMin && job.salaryMax ? `${job.salaryMin} - ${job.salaryMax} triệu` : "Thỏa thuận"}
+                    </span>
+
+                    <span
+                      style={{
+                        color: "#475569",
+                        backgroundColor: "#f1f5f9",
+                        padding: "3px 10px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {job.location || "Chưa xác định"}
+                    </span>
                   </div>
                 </div>
 
-                {/* Mô tả công việc */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <h3 style={{ fontWeight: "700", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-                    Mô tả công việc
-                  </h3>
-                  <div style={{ padding: "14px", borderRadius: "8px", backgroundColor: "#f8fafc", border: "1px solid #f1f5f9" }}>
-                    <p style={{ whiteSpace: "pre-line", color: "#334155", fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
-                      {selectedJob.description || "Chưa có thông tin mô tả chi tiết."}
-                    </p>
-                  </div>
-                </div>
+                {/* THANH THAO TÁC CỦA THẺ CÔNG VIỆC */}
+                <div style={{ display: "flex", gap: "10px", paddingTop: "12px", borderTop: "1px solid #f1f5f9" }}>
+                  {/* 🔴 CHUYỂN HƯỚNG TỚI TRANG DETAIL /jobs/[id] */}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/jobs/${job._id}`)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: "#f1f5f9",
+                      color: "#334155",
+                      padding: "9px 0",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "center",
+                    }}
+                  >
+                    Xem chi tiết
+                  </button>
 
-                {/* Yêu cầu công việc */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <h3 style={{ fontWeight: "700", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-                    Yêu cầu ứng viên
-                  </h3>
-                  <div style={{ padding: "14px", borderRadius: "8px", backgroundColor: "#f8fafc", border: "1px solid #f1f5f9" }}>
-                    <p style={{ whiteSpace: "pre-line", color: "#334155", fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
-                      {selectedJob.requirements || "Chưa có thông tin yêu cầu chi tiết."}
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenApplyModal(job)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: "#10b981",
+                      color: "#ffffff",
+                      padding: "9px 0",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
+                    }}
+                  >
+                    Ứng tuyển ngay
+                  </button>
                 </div>
-
               </div>
-            ) : (
-              <div style={{ textAlign: "center", padding: "80px 0" }}>
-                <p style={{ color: "#94a3b8", fontSize: "14px", fontWeight: "500", margin: 0 }}>
-                  Vui lòng chọn một công việc bên trái để xem thông tin chi tiết
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* POPUP FORM MODAL ỨNG TUYỂN */}
+      {applyJob && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "16px",
+              maxWidth: "520px",
+              width: "100%",
+              padding: "24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+              boxSizing: "border-box",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px", marginBottom: "16px" }}>
+              <div>
+                <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#0f172a", margin: 0 }}>
+                  Nộp hồ sơ ứng tuyển
+                </h3>
+                <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
+                  {applyJob.title} - {applyJob.companyId?.name || "Công ty"}
                 </p>
               </div>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => setApplyJob(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "20px",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                  fontWeight: "700",
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
+            <form onSubmit={handleSubmitApply} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                  Vị trí mong muốn ứng tuyển <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Frontend Developer..."
+                  value={targetPosition}
+                  onChange={(e) => setTargetPosition(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                  Chọn CV từ tài khoản <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                {myResumes.length === 0 ? (
+                  <p style={{ fontSize: "12px", color: "#ef4444", backgroundColor: "#fef2f2", padding: "8px", borderRadius: "6px", margin: 0 }}>
+                    Bạn chưa tạo CV nào trong tài khoản. Vui lòng tạo CV trước.
+                  </p>
+                ) : (
+                  <select
+                    required
+                    value={selectedResumeId}
+                    onChange={(e) => setSelectedResumeId(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      outline: "none",
+                      backgroundColor: "#ffffff",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    {myResumes.map((cv) => (
+                      <option key={cv._id} value={cv._id}>
+                        📄 {cv.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#334155", marginBottom: "6px" }}>
+                  Thư giới thiệu / Lời nhắn tới Nhà tuyển dụng
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Giới thiệu ngắn gọn về bản thân..."
+                  value={selfIntroduction}
+                  onChange={(e) => setSelfIntroduction(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    outline: "none",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setApplyJob(null)}
+                  style={{
+                    backgroundColor: "#f1f5f9",
+                    color: "#475569",
+                    padding: "10px 18px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isApplying || myResumes.length === 0}
+                  style={{
+                    backgroundColor: isApplying || myResumes.length === 0 ? "#cbd5e1" : "#10b981",
+                    color: "#ffffff",
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    border: "none",
+                    cursor: isApplying || myResumes.length === 0 ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
+                  }}
+                >
+                  {isApplying ? "Đang gửi..." : "Gửi hồ sơ ngay"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
