@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation"; // 👈 Thêm router
+import { isSalaryRange, matchesSalaryRange, SALARY_RANGES, type SalaryRange } from "@/src/lib/jobSearch";
+
+interface CategoryOption {
+  _id: string;
+  name: string;
+}
+
+interface CategoryReference {
+  _id: string;
+}
 
 interface JobItem {
   _id: string;
@@ -9,6 +19,8 @@ interface JobItem {
   companyId?: {
     name?: string;
   };
+  hiringStatus?: "OPEN" | "CLOSED";
+  categoryId?: CategoryReference | string;
   salaryMin?: number;
   salaryMax?: number;
   location?: string;
@@ -21,10 +33,41 @@ interface ResumeItem {
   title: string;
 }
 
-export default function JobsPage() {
+interface JobsPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function formatSalary(salaryMin?: number, salaryMax?: number) {
+  if (!salaryMin || !salaryMax) return "Thỏa thuận";
+
+  const formatMillions = (amount: number) =>
+    new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(amount / 1_000_000);
+
+  return `${formatMillions(salaryMin)} – ${formatMillions(salaryMax)} triệu/tháng`;
+}
+
+export default function JobsPage({ searchParams }: JobsPageProps) {
   const router = useRouter(); // 👈 Khởi tạo router
+  const initialSearchParams = use(searchParams);
+  const initialSearch = typeof initialSearchParams.search === "string" ? initialSearchParams.search : "";
+  const initialCategory = typeof initialSearchParams.category === "string" ? initialSearchParams.category : "";
+  const initialSalary = typeof initialSearchParams.salary === "string" ? initialSearchParams.salary : null;
+  const initialLocation = typeof initialSearchParams.location === "string" ? initialSearchParams.location : "";
+  const initialPageParam = typeof initialSearchParams.page === "string" ? Number(initialSearchParams.page) : 1;
+  const initialPage = Number.isInteger(initialPageParam) && initialPageParam > 0 ? initialPageParam : 1;
   const [jobs, setJobs] = useState<JobItem[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [selectedSalary, setSelectedSalary] = useState<SalaryRange>(
+    isSalaryRange(initialSalary) ? initialSalary : ""
+  );
+  const [selectedLocation, setSelectedLocation] = useState(initialLocation);
+  const [page, setPage] = useState(initialPage);
   const [myResumes, setMyResumes] = useState<ResumeItem[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -35,11 +78,6 @@ export default function JobsPage() {
   const [targetPosition, setTargetPosition] = useState("");
   const [selfIntroduction, setSelfIntroduction] = useState("");
 
-  useEffect(() => {
-    fetchJobs();
-    fetchResumes();
-  }, []);
-
   const fetchJobs = async () => {
     try {
       const res = await fetch("/api/jobs");
@@ -48,8 +86,19 @@ export default function JobsPage() {
       
       const jobList = data.data || [];
       setJobs(jobList);
-    } catch (err: any) {
-      setErrorMessage(err.message || "Lỗi khi tải việc làm");
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, "Lỗi khi tải việc làm"));
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Không tải được danh mục ngành nghề");
+      setCategories(data);
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, "Lỗi khi tải danh mục ngành nghề"));
     }
   };
 
@@ -70,10 +119,16 @@ export default function JobsPage() {
       if (list.length > 0) {
         setSelectedResumeId(list[0]._id);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("fetchResumes error", err);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() =>
+      Promise.all([fetchJobs(), fetchCategories(), fetchResumes()])
+    );
+  }, []);
 
   const handleOpenApplyModal = (job: JobItem) => {
     const token = localStorage.getItem("token");
@@ -120,18 +175,70 @@ export default function JobsPage() {
       alert(data.message || "Ứng tuyển thành công!");
       setApplyJob(null);
       setSelfIntroduction("");
-    } catch (err: any) {
-      alert(err.message || "Có lỗi xảy ra khi ứng tuyển");
+    } catch (err) {
+      alert(getErrorMessage(err, "Có lỗi xảy ra khi ứng tuyển"));
     } finally {
       setIsApplying(false);
     }
   };
 
+  const locations = Array.from(
+    new Set(jobs.map((job) => job.location?.trim()).filter((location): location is string => Boolean(location)))
+  );
+
   const filteredJobs = jobs.filter((job) => {
+    const normalizedSearch = search.trim().toLowerCase();
     const title = job.title?.toLowerCase() || "";
     const company = job.companyId?.name?.toLowerCase() || "";
-    return title.includes(search.toLowerCase()) || company.includes(search.toLowerCase());
+    const jobCategoryId = typeof job.categoryId === "string" ? job.categoryId : job.categoryId?._id;
+    return (
+      (!normalizedSearch || title.includes(normalizedSearch) || company.includes(normalizedSearch)) &&
+      (!selectedCategory || jobCategoryId === selectedCategory) &&
+      matchesSalaryRange(job.salaryMin, job.salaryMax, selectedSalary) &&
+      (!selectedLocation || job.location?.toLowerCase() === selectedLocation.toLowerCase())
+    );
   });
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedJobs = filteredJobs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageNumbers: Array<number | "ellipsis"> =
+    totalPages <= 7
+      ? Array.from({ length: totalPages }, (_, index) => index + 1)
+      : currentPage <= 4
+        ? [1, 2, 3, 4, 5, "ellipsis", totalPages]
+        : currentPage >= totalPages - 3
+          ? [1, "ellipsis", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+          : [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages];
+
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPage(1);
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (selectedCategory) params.set("category", selectedCategory);
+    if (selectedSalary) params.set("salary", selectedSalary);
+    if (selectedLocation) params.set("location", selectedLocation);
+
+    const query = params.toString();
+    router.replace(query ? `/jobs?${query}` : "/jobs", { scroll: false });
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    const safePage = Math.max(1, Math.min(nextPage, totalPages));
+    setPage(safePage);
+
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (selectedCategory) params.set("category", selectedCategory);
+    if (selectedSalary) params.set("salary", selectedSalary);
+    if (selectedLocation) params.set("location", selectedLocation);
+    if (safePage > 1) params.set("page", String(safePage));
+
+    const query = params.toString();
+    router.push(query ? `/jobs?${query}` : "/jobs", { scroll: false });
+  };
 
   return (
     <div
@@ -146,7 +253,8 @@ export default function JobsPage() {
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
         
         {/* THANH TÌM KIẾM */}
-        <div
+        <form
+          onSubmit={handleSearch}
           style={{
             backgroundColor: "#ffffff",
             padding: "16px",
@@ -174,9 +282,80 @@ export default function JobsPage() {
               boxSizing: "border-box",
             }}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Từ khóa hoặc tên công ty"
           />
+          <select
+            aria-label="Vị trí"
+            value={selectedCategory}
+            onChange={(e) => {
+              setSelectedCategory(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              flex: "1 1 170px",
+              padding: "10px 12px",
+              backgroundColor: "#f8fafc",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              fontSize: "14px",
+              color: "#475569",
+            }}
+          >
+            <option value="">Tất cả vị trí</option>
+            {categories.map((category) => (
+              <option key={category._id} value={category._id}>{category.name}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Mức lương"
+            value={selectedSalary}
+            onChange={(e) => {
+              setSelectedSalary(isSalaryRange(e.target.value) ? e.target.value : "");
+              setPage(1);
+            }}
+            style={{
+              flex: "1 1 150px",
+              padding: "10px 12px",
+              backgroundColor: "#f8fafc",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              fontSize: "14px",
+              color: "#475569",
+            }}
+          >
+            <option value="">Mọi mức lương</option>
+            {SALARY_RANGES.map((range) => (
+              <option key={range.value} value={range.value}>{range.label}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Khu vực làm việc"
+            value={selectedLocation}
+            onChange={(e) => {
+              setSelectedLocation(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              flex: "1 1 150px",
+              padding: "10px 12px",
+              backgroundColor: "#f8fafc",
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              fontSize: "14px",
+              color: "#475569",
+            }}
+          >
+            <option value="">Tất cả khu vực</option>
+            {locations.map((location) => (
+              <option key={location} value={location}>{location}</option>
+            ))}
+          </select>
           <button
+            type="submit"
             style={{
               backgroundColor: "#10b981",
               color: "#ffffff",
@@ -191,7 +370,7 @@ export default function JobsPage() {
           >
             Tìm kiếm
           </button>
-        </div>
+        </form>
 
         {errorMessage && (
           <div
@@ -248,7 +427,7 @@ export default function JobsPage() {
               gap: "20px",
             }}
           >
-            {filteredJobs.map((job) => (
+            {paginatedJobs.map((job) => (
               <div
                 key={job._id}
                 style={{
@@ -283,15 +462,21 @@ export default function JobsPage() {
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px", fontSize: "12px" }}>
                     <span
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
                         color: "#047857",
-                        fontWeight: "600",
-                        backgroundColor: "#ecfdf5",
-                        padding: "3px 10px",
-                        borderRadius: "6px",
+                        fontWeight: "700",
+                        background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
+                        padding: "6px 11px",
+                        borderRadius: "999px",
                         border: "1px solid #a7f3d0",
+                        boxShadow: "0 1px 2px rgba(4, 120, 87, 0.08)",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {job.salaryMin && job.salaryMax ? `${job.salaryMin} - ${job.salaryMax} triệu` : "Thỏa thuận"}
+                      <span aria-hidden="true">💰</span>
+                      <span>{formatSalary(job.salaryMin, job.salaryMax)}</span>
                     </span>
 
                     <span
@@ -329,29 +514,110 @@ export default function JobsPage() {
                     Xem chi tiết
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenApplyModal(job)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: "#10b981",
-                      color: "#ffffff",
-                      padding: "9px 0",
-                      borderRadius: "8px",
-                      fontSize: "13px",
-                      fontWeight: "700",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "center",
-                      boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
-                    }}
-                  >
-                    Ứng tuyển ngay
-                  </button>
+                  {job.hiringStatus !== "CLOSED" && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenApplyModal(job)}
+                      style={{
+                        flex: 1,
+                        backgroundColor: "#10b981",
+                        color: "#ffffff",
+                        padding: "9px 0",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        fontWeight: "700",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "center",
+                        boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
+                      }}
+                    >
+                      Ứng tuyển ngay
+                    </button>
+                  )}
+                  {job.hiringStatus === "CLOSED" && (
+                    <span style={{ flex: 1, padding: "9px 0", color: "#b45309", backgroundColor: "#fffbeb", borderRadius: "8px", fontSize: "12px", fontWeight: 700, textAlign: "center" }}>
+                      Đã hết tuyển dụng
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
+        )}
+
+        {filteredJobs.length > 0 && totalPages > 1 && (
+          <nav
+            aria-label="Phân trang danh sách việc làm"
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px",
+              marginTop: "28px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              aria-label="Trang trước"
+              style={{
+                padding: "8px 12px",
+                border: "1px solid #cbd5e1",
+                borderRadius: "8px",
+                backgroundColor: currentPage === 1 ? "#f1f5f9" : "#fff",
+                color: currentPage === 1 ? "#94a3b8" : "#334155",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer",
+              }}
+            >
+              Trước
+            </button>
+            {pageNumbers.map((pageNumber, index) =>
+              pageNumber === "ellipsis" ? (
+                <span key={`ellipsis-${index}`} aria-hidden="true" style={{ padding: "0 4px", color: "#64748b" }}>
+                  …
+                </span>
+              ) : (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => handlePageChange(pageNumber)}
+                  aria-label={`Trang ${pageNumber}`}
+                  aria-current={currentPage === pageNumber ? "page" : undefined}
+                  style={{
+                    minWidth: "38px",
+                    padding: "8px 10px",
+                    border: `1px solid ${currentPage === pageNumber ? "#10b981" : "#cbd5e1"}`,
+                    borderRadius: "8px",
+                    backgroundColor: currentPage === pageNumber ? "#10b981" : "#fff",
+                    color: currentPage === pageNumber ? "#fff" : "#334155",
+                    fontWeight: currentPage === pageNumber ? "700" : "500",
+                    cursor: "pointer",
+                  }}
+                >
+                  {pageNumber}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              aria-label="Trang tiếp theo"
+              style={{
+                padding: "8px 12px",
+                border: "1px solid #cbd5e1",
+                borderRadius: "8px",
+                backgroundColor: currentPage === totalPages ? "#f1f5f9" : "#fff",
+                color: currentPage === totalPages ? "#94a3b8" : "#334155",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+              }}
+            >
+              Sau
+            </button>
+          </nav>
         )}
       </div>
 

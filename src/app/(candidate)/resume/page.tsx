@@ -2,19 +2,40 @@
 
 import { useState, useEffect } from "react";
 
+interface CategoryOption {
+  _id: string;
+  name: string;
+}
+
+interface UserProfileData {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  avatar?: string;
+}
+
+interface UserProfileResponse {
+  success: boolean;
+  message?: string;
+  data?: UserProfileData;
+}
+
 export default function CVBuilderPage() {
   const [token, setToken] = useState("");
   const [title, setTitle] = useState("CV Kỹ Sư Phần Mềm");
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [profileError, setProfileError] = useState("");
+  const [categoryError, setCategoryError] = useState("");
 
   // STATE ĐÃ ĐƯỢC NÂNG CẤP ĐẦY ĐỦ CÁC TRƯỜNG THEO YÊU CẦU
   const [cvData, setCvData] = useState({
-    fullName: "Nguyễn Văn A",
+    fullName: "",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200&h=200",
-    phone: "0912345678",
-    email: "nguyenvana@gmail.com",
+    phone: "",
+    email: "",
     address: "Quận 1, TP. Hồ Chí Minh",
-    targetPosition: "Fullstack Developer",
+    targetPosition: "",
     summary: "Tôi là một lập trình viên năng động, mong muốn cống hiến và phát triển các sản phẩm web chất lượng cao...",
     technicalSkills: "ReactJS, Next.js, Node.js, MongoDB, TypeScript",
     softSkills: "Làm việc nhóm, Giải quyết vấn đề, Giao tiếp, Quản lý thời gian",
@@ -32,27 +53,67 @@ export default function CVBuilderPage() {
   });
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    if (storedToken) setToken(storedToken);
+    async function loadFormData() {
+      const storedToken = localStorage.getItem("token");
+      if (storedToken) {
+        setToken(storedToken);
+      }
 
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+      if (storedToken) {
+        try {
+          const response = await fetch("/api/users/profile", {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          });
+          const result: UserProfileResponse = await response.json();
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || "Không thể tải thông tin tài khoản.");
+          }
+
+          const user = result.data;
+          if (!user) {
+            throw new Error("Không tìm thấy thông tin tài khoản.");
+          }
+          setCvData((prev) => ({
+            ...prev,
+            fullName: user.fullName || "",
+            email: user.email || "",
+            phone: user.phone || "",
+            avatar: user.avatar || prev.avatar,
+          }));
+        } catch (error) {
+          console.error("Lỗi khi tải thông tin tài khoản:", error);
+          setProfileError(
+            error instanceof Error ? error.message : "Không thể tải thông tin tài khoản."
+          );
+        }
+      }
+
       try {
-        const user = JSON.parse(storedUser);
-        setCvData((prev) => ({
-          ...prev,
-          fullName: user.fullName || prev.fullName,
-          email: user.email || prev.email,
-        }));
-      } catch (e) {
-        console.error("Lỗi khi đọc dữ liệu user:", e);
+        const response = await fetch("/api/categories");
+        if (!response.ok) {
+          const errorResult: { message?: string } = await response.json();
+          throw new Error(errorResult.message || "Không thể tải danh sách ngành nghề.");
+        }
+        const result: CategoryOption[] = await response.json();
+        setCategories(result);
+      } catch (error) {
+        console.error("Lỗi khi tải danh sách ngành nghề:", error);
+        setCategoryError(
+          error instanceof Error ? error.message : "Không thể tải danh sách ngành nghề."
+        );
       }
     }
+
+    void loadFormData();
   }, []);
 
   const handleSaveCV = async () => {
     if (!token) {
       alert("Vui lòng đăng nhập tài khoản Ứng viên trước khi lưu CV!");
+      return;
+    }
+    if (!cvData.targetPosition) {
+      alert("Vui lòng chọn ngành nghề muốn ứng tuyển!");
       return;
     }
     setLoading(true);
@@ -68,8 +129,8 @@ export default function CVBuilderPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Không thể lưu CV");
       alert("🎉 " + (data.message || "Lưu CV thành công!"));
-    } catch (err: any) {
-      alert("Lỗi: " + err.message);
+    } catch (err) {
+      alert("Lỗi: " + (err instanceof Error ? err.message : "Không thể lưu CV."));
     } finally {
       setLoading(false);
     }
@@ -195,32 +256,46 @@ export default function CVBuilderPage() {
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#475569", marginBottom: "4px" }}>Vị trí ứng tuyển</label>
-                  <input
-                    type="text"
-                    style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
+                  <select
+                    required
+                    style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none", backgroundColor: "#fff", boxSizing: "border-box" }}
                     value={cvData.targetPosition}
                     onChange={(e) => setCvData({ ...cvData, targetPosition: e.target.value })}
-                  />
+                  >
+                    <option value="">Chọn ngành nghề muốn ứng tuyển</option>
+                    {categories.map((category) => (
+                      <option key={category._id} value={category.name}>{category.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
+
+              {(profileError || categoryError) && (
+                <p role="alert" style={{ color: "#b91c1c", fontSize: "12px", margin: 0 }}>
+                  {[profileError, categoryError].filter(Boolean).join(" ")}
+                </p>
+              )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#475569", marginBottom: "4px" }}>Số điện thoại</label>
                   <input
                     type="text"
+                    readOnly
+                    aria-label="Số điện thoại lấy từ hồ sơ tài khoản"
+                    placeholder="Cập nhật trong hồ sơ cá nhân"
                     style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
                     value={cvData.phone}
-                    onChange={(e) => setCvData({ ...cvData, phone: e.target.value })}
                   />
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#475569", marginBottom: "4px" }}>Email liên hệ</label>
                   <input
                     type="email"
+                    readOnly
+                    aria-label="Email lấy từ hồ sơ tài khoản"
                     style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
                     value={cvData.email}
-                    onChange={(e) => setCvData({ ...cvData, email: e.target.value })}
                   />
                 </div>
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 
 interface JobDetail {
@@ -8,7 +8,9 @@ interface JobDetail {
   title: string;
   companyId?: {
     name?: string;
+    scale?: string;
   };
+  hiringStatus?: "OPEN" | "CLOSED";
   salaryMin?: number;
   salaryMax?: number;
   location?: string;
@@ -38,12 +40,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [selfIntroduction, setSelfIntroduction] = useState("");
   const [isApplying, setIsApplying] = useState(false);
 
-  useEffect(() => {
-    fetchJobDetail();
-    fetchResumes();
-  }, [jobId]);
+  const formatSalary = (salaryMin?: number, salaryMax?: number) => {
+    if (!salaryMin || !salaryMax) return "Thỏa thuận";
+    const formatMillions = (amount: number) =>
+      new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(amount / 1_000_000);
+    return `${formatMillions(salaryMin)} – ${formatMillions(salaryMax)} triệu/tháng`;
+  };
 
-  const fetchJobDetail = async () => {
+  const fetchJobDetail = useCallback(async () => {
     try {
       const res = await fetch(`/api/jobs/${jobId}`);
       const data = await res.json();
@@ -52,14 +56,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const jobData = data.data || data;
       setJob(jobData);
       setTargetPosition(jobData.title || "");
-    } catch (err: any) {
-      setError(err.message || "Có lỗi xảy ra khi tải chi tiết công việc");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Có lỗi xảy ra khi tải chi tiết công việc");
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId]);
 
-  const fetchResumes = async () => {
+  const fetchResumes = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
@@ -76,10 +80,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       if (list.length > 0) {
         setSelectedResumeId(list[0]._id);
       }
-    } catch (err: any) {
-      console.error("fetchResumes error:", err);
+    } catch (error: unknown) {
+      console.error("fetchResumes error:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchJobDetail);
+    void Promise.resolve().then(fetchResumes);
+  }, [fetchJobDetail, fetchResumes]);
 
   const handleOpenApplyModal = () => {
     const token = localStorage.getItem("token");
@@ -124,8 +133,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       alert(data.message || "Ứng tuyển thành công!");
       setIsApplyModalOpen(false);
       setSelfIntroduction("");
-    } catch (err: any) {
-      alert(err.message || "Có lỗi xảy ra khi ứng tuyển");
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Có lỗi xảy ra khi ứng tuyển");
     } finally {
       setIsApplying(false);
     }
@@ -254,8 +263,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <span
               style={{
                 display: "inline-block",
-                backgroundColor: "#eff6ff",
-                color: "#2563eb",
+                backgroundColor: job.hiringStatus === "CLOSED" ? "#fff7ed" : "#eff6ff",
+                color: job.hiringStatus === "CLOSED" ? "#c2410c" : "#2563eb",
                 fontSize: "12px",
                 fontWeight: "700",
                 padding: "4px 10px",
@@ -265,7 +274,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 letterSpacing: "0.05em",
               }}
             >
-              Đang tuyển dụng
+              {job.hiringStatus === "CLOSED" ? "Đã hết tuyển dụng" : "Đang tuyển dụng"}
             </span>
             <h1
               style={{
@@ -282,6 +291,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <p style={{ fontSize: "16px", fontWeight: "600", color: "#475569", marginTop: "10px", margin: "10px 0 0 0", display: "flex", alignItems: "center", gap: "6px" }}>
               🏢 {job.companyId?.name || "Công ty chưa rõ"}
             </p>
+            {job.companyId?.scale && (
+              <p style={{ fontSize: "13px", color: "#64748b", margin: "6px 0 0" }}>
+                👥 Số lượng nhân sự tuyển dụng: {job.companyId.scale}
+              </p>
+            )}
           </div>
 
           {/* HÀNG DƯỚI: BADGES CHI TIẾT & NÚT ỨNG TUYỂN */}
@@ -312,7 +326,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   gap: "6px",
                 }}
               >
-                💰 Lương: {job.salaryMin && job.salaryMax ? `${job.salaryMin} - ${job.salaryMax} triệu` : "Thỏa thuận"}
+                💰 Lương: {formatSalary(job.salaryMin, job.salaryMax)}
               </div>
 
               <div
@@ -449,36 +463,40 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           >
             <div>
               <p style={{ margin: 0, fontWeight: "700", color: "#0f172a", fontSize: "15px" }}>
-                Bạn cảm thấy phù hợp với vị trí này?
+                {job.hiringStatus === "CLOSED" ? "Vị trí này đã hết tuyển dụng" : "Bạn cảm thấy phù hợp với vị trí này?"}
               </p>
               <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "13px" }}>
-                Ứng tuyển ngay để Nhà tuyển dụng xem xét hồ sơ của bạn sớm nhất.
+                {job.hiringStatus === "CLOSED"
+                  ? "Nhà tuyển dụng hiện không nhận thêm hồ sơ cho công việc này."
+                  : "Ứng tuyển ngay để Nhà tuyển dụng xem xét hồ sơ của bạn sớm nhất."}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleOpenApplyModal}
-              style={{
-                backgroundColor: "#10b981",
-                color: "#ffffff",
-                padding: "12px 28px",
-                borderRadius: "10px",
-                fontSize: "14px",
-                fontWeight: "700",
-                border: "none",
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
-              }}
-            >
-              Ứng tuyển ngay
-            </button>
+            {job.hiringStatus !== "CLOSED" && (
+              <button
+                type="button"
+                onClick={handleOpenApplyModal}
+                style={{
+                  backgroundColor: "#10b981",
+                  color: "#ffffff",
+                  padding: "12px 28px",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: "700",
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                }}
+              >
+                Ứng tuyển ngay
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* POPUP FORM MODAL ỨNG TUYỂN */}
-      {isApplyModalOpen && (
+      {isApplyModalOpen && job.hiringStatus !== "CLOSED" && (
         <div
           style={{
             position: "fixed",

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
 import { getAuthPayload } from "@/src/lib/auth";
 import Application from "@/src/models/Application"; 
-import User from "@/src/models/User";
-import Resume from "@/src/models/Resume";
+import Job from "@/src/models/Job";
 import mongoose from "mongoose";
 
 // ==========================================
@@ -48,6 +47,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    const job = await Job.findById(jobId).select("hiringStatus");
+    if (!job) {
+      return NextResponse.json(
+        { success: false, message: "Không tìm thấy công việc." },
+        { status: 404 }
+      );
+    }
+    if (job.hiringStatus === "CLOSED") {
+      return NextResponse.json(
+        { success: false, message: "Công việc đã hết tuyển dụng và không nhận hồ sơ mới." },
+        { status: 409 }
+      );
+    }
+
     // 3. Kiểm tra trùng lặp
     const alreadyApplied = await Application.findOne({ 
       jobId: new mongoose.Types.ObjectId(jobId), 
@@ -76,10 +89,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       data: newApplication
     }, { status: 201 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     // In lỗi chi tiết ra màn hình terminal của VS Code để dễ kiểm soát
     console.error("❌ LỖI API POST APPLY:", error);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Không thể nộp hồ sơ ứng tuyển";
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
@@ -114,8 +128,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       data: applicants 
     }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ LỖI API GET APPLY:", error);
-    return NextResponse.json({ success: false, message: "Lỗi hệ thống", error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Lỗi hệ thống";
+    return NextResponse.json({ success: false, message: "Lỗi hệ thống", error: message }, { status: 500 });
   }
 }

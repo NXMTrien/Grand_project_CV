@@ -83,3 +83,17 @@ body {
   border: 1px solid #e2e8f0;
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
 }
+
+.home-content-layout {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+
+.home-job-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+
+@media (max-width: 760px) {
+  .home-content-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

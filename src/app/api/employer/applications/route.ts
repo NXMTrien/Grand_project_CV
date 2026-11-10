@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
 import Application from "@/src/models/Application";
 import Job from "@/src/models/Job";
+import Company from "@/src/models/Company";
 import "@/src/models/User";
 import "@/src/models/Resume"; // Khai báo model Resume
 import jwt from "jsonwebtoken";
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       try {
         const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
         employerId = decoded.userId;
-      } catch (err) {
+      } catch {
         return NextResponse.json(
           { success: false, message: "Token không hợp lệ hoặc đã hết hạn!" },
           { status: 401 }
@@ -41,8 +42,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const companyId = request.nextUrl.searchParams.get("companyId");
+    if (companyId && !mongoose.Types.ObjectId.isValid(companyId)) {
+      return NextResponse.json(
+        { success: false, message: "ID công ty không hợp lệ." },
+        { status: 400 }
+      );
+    }
+
+    if (companyId) {
+      const ownedCompany = await Company.exists({
+        _id: companyId,
+        createdBy: employerId,
+      });
+      if (!ownedCompany) {
+        return NextResponse.json(
+          { success: false, message: "Bạn không có quyền xem hồ sơ của công ty này." },
+          { status: 403 }
+        );
+      }
+    }
+
     // Lấy các bài đăng tuyển dụng do NTD quản lý
-    const employerJobs = await Job.find({ managerId: employerId }).select("_id title");
+    const employerJobs = await Job.find({
+      managerId: employerId,
+      ...(companyId ? { companyId } : {}),
+    }).select("_id title");
     const jobIds = employerJobs.map((j) => j._id);
 
     if (jobIds.length === 0) {
@@ -69,9 +94,15 @@ export async function GET(request: NextRequest) {
       { success: true, total: applications.length, data: applications },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("❌ LỖI GET EMPLOYER APPLICATIONS:", error);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Không thể tải hồ sơ ứng tuyển.",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -104,7 +135,13 @@ export async function PUT(request: NextRequest) {
       { success: true, message: `Đã cập nhật trạng thái: ${status}`, data: updatedApp },
       { status: 200 }
     );
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Không thể cập nhật hồ sơ ứng tuyển.",
+      },
+      { status: 500 }
+    );
   }
 }

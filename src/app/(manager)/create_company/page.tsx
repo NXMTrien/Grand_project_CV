@@ -15,12 +15,29 @@ interface CompanyItem {
   createdAt?: string;
 }
 
+interface CompanyJob {
+  _id: string;
+  title: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  location?: string;
+  status: string;
+  hiringStatus?: "OPEN" | "CLOSED";
+  applicationCount: number;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function CreateCompanyPage() {
   const router = useRouter();
 
   // State quản lý danh sách công ty của tôi
   const [myCompanies, setMyCompanies] = useState<CompanyItem[]>([]);
   const [fetchingCompanies, setFetchingCompanies] = useState(true);
+  const [companyJobs, setCompanyJobs] = useState<Record<string, CompanyJob[]>>({});
+  const [companyJobsError, setCompanyJobsError] = useState("");
 
   // State Form Tạo công ty mới
   const [formData, setFormData] = useState({
@@ -74,14 +91,69 @@ export default function CreateCompanyPage() {
       const result = await res.json();
 
       if (res.ok && result.success) {
-        setMyCompanies(result.data || []);
+        const companies: CompanyItem[] = result.data || [];
+        setMyCompanies(companies);
+
+        const jobsRes = await fetch("/api/companies/my-company/jobs", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const jobsResult = await jobsRes.json();
+        if (!jobsRes.ok || !jobsResult.success) {
+          throw new Error(jobsResult.message || "Không tải được công việc của công ty.");
+        }
+        setCompanyJobs(
+          Object.fromEntries(
+            (jobsResult.data || []).map(
+              (item: { companyId: string; jobs: CompanyJob[] }) => [item.companyId, item.jobs]
+            )
+          )
+        );
+        setCompanyJobsError("");
+      } else {
+        throw new Error(result.message || "Không tải được danh sách công ty.");
       }
     } catch (err) {
       console.error("Lỗi khi tải danh sách công ty:", err);
+      setCompanyJobsError(err instanceof Error ? err.message : "Không thể tải dữ liệu công ty.");
     } finally {
       setFetchingCompanies(false);
     }
   }, []);
+
+  const handleHiringStatusChange = async (jobId: string, hiringStatus: "OPEN" | "CLOSED") => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setCompanyJobsError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/jobs/${jobId}/hiring-status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ hiringStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Không thể cập nhật trạng thái tuyển dụng.");
+      }
+
+      setCompanyJobs((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([companyId, jobs]) => [
+            companyId,
+            jobs.map((job) => (job._id === jobId ? { ...job, hiringStatus } : job)),
+          ])
+        )
+      );
+      setCompanyJobsError("");
+    } catch (error) {
+      setCompanyJobsError(getErrorMessage(error, "Không thể cập nhật trạng thái tuyển dụng."));
+    }
+  };
 
   // 2. Kiểm tra Authentication & Role
   useEffect(() => {
@@ -101,7 +173,7 @@ export default function CreateCompanyPage() {
         router.push("/");
         return;
       }
-      fetchMyCompanies(token);
+      void Promise.resolve().then(() => fetchMyCompanies(token));
     } catch {
       router.push("/login");
     }
@@ -193,8 +265,8 @@ export default function CreateCompanyPage() {
       });
       setImagesList([]);
       fetchMyCompanies(token);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err, "Tạo công ty thất bại."));
     } finally {
       setLoading(false);
     }
@@ -299,8 +371,8 @@ export default function CreateCompanyPage() {
       setSuccess("Cập nhật thông tin công ty thành công!");
       handleCloseModal();
       fetchMyCompanies(token);
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err) {
+      setModalError(getErrorMessage(err, "Cập nhật công ty thất bại."));
     } finally {
       setEditLoading(false);
     }
@@ -339,8 +411,8 @@ export default function CreateCompanyPage() {
       setSuccess("Đã xóa công ty thành công!");
       handleCloseModal();
       fetchMyCompanies(token);
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err) {
+      setModalError(getErrorMessage(err, "Xóa công ty thất bại."));
     } finally {
       setDeleteLoading(false);
     }
@@ -588,29 +660,81 @@ export default function CreateCompanyPage() {
               Bạn chưa tạo công ty nào. Hãy điền form bên trên để tạo công ty đầu tiên!
             </p>
           ) : (
-            <div style={{ display: "grid", gap: "12px" }}>
+            <div style={{ display: "grid", gap: "16px" }}>
               {myCompanies.map((comp) => (
-                <div key={comp._id} style={styles.companyItem}>
-                  <img
-                    src={comp.logo || "https://via.placeholder.com/50?text=Logo"}
-                    alt={comp.name}
-                    style={styles.companyItemLogo}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", color: "#0f172a" }}>{comp.name}</h4>
-                    <p style={{ margin: 0, fontSize: "12.5px", color: "#64748b" }}>
-                      📍 {comp.address || "Chưa cập nhật"} • 👥 {comp.scale}
-                    </p>
+                <div key={comp._id} style={{ border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px" }}>
+                  <div style={styles.companyItem}>
+                    <img
+                      src={comp.logo || "https://via.placeholder.com/50?text=Logo"}
+                      alt={comp.name}
+                      style={styles.companyItemLogo}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 style={{ margin: "0 0 4px 0", fontSize: "15px", color: "#0f172a" }}>{comp.name}</h4>
+                      <p style={{ margin: 0, fontSize: "12.5px", color: "#64748b" }}>
+                        📍 {comp.address || "Chưa cập nhật"} • 👥 {comp.scale}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(comp)}
+                      style={styles.editBtn}
+                    >
+                      ✏️ Chỉnh sửa
+                    </button>
                   </div>
 
-                  {/* Nút Chỉnh sửa Mở Modal */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditModal(comp)}
-                    style={styles.editBtn}
-                  >
-                    ✏️ Chỉnh sửa
-                  </button>
+                  <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #f1f5f9" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }}>
+                      <h5 style={{ margin: 0, fontSize: "14px", color: "#0f172a" }}>
+                        Công việc của công ty ({companyJobs[comp._id]?.length || 0})
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/applications?companyId=${encodeURIComponent(comp._id)}&companyName=${encodeURIComponent(comp.name)}`)}
+                        style={{ border: "none", borderRadius: "8px", padding: "8px 12px", backgroundColor: "#10b981", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                      >
+                        Kiểm tra ứng viên ({(companyJobs[comp._id] || []).reduce((total, job) => total + job.applicationCount, 0)})
+                      </button>
+                    </div>
+                    {companyJobsError ? (
+                      <p role="alert" style={{ margin: 0, color: "#b91c1c", fontSize: "13px" }}>{companyJobsError}</p>
+                    ) : (companyJobs[comp._id] || []).length === 0 ? (
+                      <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>Công ty chưa có bài đăng tuyển dụng.</p>
+                    ) : (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        {companyJobs[comp._id].map((job) => (
+                          <div key={job._id} style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap", padding: "9px 10px", borderRadius: "8px", backgroundColor: "#f8fafc" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ margin: 0, color: "#334155", fontSize: "13px", fontWeight: 600 }}>{job.title}</p>
+                              <p style={{ margin: "3px 0 0", color: "#64748b", fontSize: "12px" }}>
+                                {job.salaryMin && job.salaryMax
+                                  ? `${(job.salaryMin / 1_000_000).toLocaleString()} - ${(job.salaryMax / 1_000_000).toLocaleString()} triệu`
+                                  : "Thỏa thuận"}
+                                {job.location ? ` • ${job.location}` : ""}
+                                {` • ${job.status === "APPROVED" ? "Đã duyệt" : job.status}`}
+                              </p>
+                            </div>
+                            <span style={{ color: "#047857", fontSize: "12px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                              {job.applicationCount} hồ sơ
+                            </span>
+                            <select
+                              aria-label={`Trạng thái tuyển dụng: ${job.title}`}
+                              value={job.hiringStatus === "CLOSED" ? "CLOSED" : "OPEN"}
+                              onChange={(event) =>
+                                handleHiringStatusChange(job._id, event.target.value as "OPEN" | "CLOSED")
+                              }
+                              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 9px", backgroundColor: job.hiringStatus === "CLOSED" ? "#fff7ed" : "#ecfdf5", color: job.hiringStatus === "CLOSED" ? "#c2410c" : "#047857", fontSize: "12px", fontWeight: 600 }}
+                            >
+                              <option value="OPEN">Đang tuyển dụng</option>
+                              <option value="CLOSED">Hết tuyển dụng</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

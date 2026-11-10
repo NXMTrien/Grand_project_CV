@@ -1,13 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { isSalaryRange, SALARY_RANGES, type SalaryRange } from "@/src/lib/jobSearch";
+
+interface CategoryOption {
+  _id: string;
+  name: string;
+}
+
+interface HomeJob {
+  id: string;
+  title: string;
+  company: string;
+  salary: string;
+  location: string;
+  logoText: string;
+  logoBg: string;
+  logoColor: string;
+}
+
+interface ApiJob {
+  _id: string;
+  title: string;
+  companyId?: { name?: string };
+  salaryMin?: number;
+  salaryMax?: number;
+  location?: string;
+}
 
 export default function TopCVHomePage() {
+  const router = useRouter();
   const [searchTitle, setSearchTitle] = useState("");
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [hotJobs, setHotJobs] = useState<any[]>([]);
+  const [hotJobs, setHotJobs] = useState<HomeJob[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSalary, setSelectedSalary] = useState<SalaryRange>("");
+  const [selectedLocation, setSelectedLocation] = useState("");
 
   useEffect(() => {
     async function loadHotJobs() {
@@ -17,20 +50,31 @@ export default function TopCVHomePage() {
           throw new Error("Không tải được việc làm");
         }
         const json = await res.json();
+        const jobs: ApiJob[] = json.data || [];
+        setLocations(
+          Array.from(
+            new Set(
+              jobs
+                .map((job) => job.location?.trim())
+                .filter((location): location is string => Boolean(location))
+            )
+          )
+        );
         setHotJobs(
-          (json.data || []).map((job: any) => ({
+          jobs.map((job) => ({
             id: job._id,
             title: job.title,
             company: job.companyId?.name || "Công ty chưa rõ",
             salary:
               job.salaryMin && job.salaryMax
-                ? `${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()} đồng`
+                ? `${(job.salaryMin / 1_000_000).toLocaleString()} - ${(job.salaryMax / 1_000_000).toLocaleString()} triệu`
                 : "Thỏa thuận",
             location: job.location || "Chưa rõ",
             logoText: job.companyId?.name?.charAt(0) || "C",
             logoBg: "#f8fafc",
             logoColor: "#0f172a"
           }))
+          .slice(0, 6)
         );
       } catch (error) {
         console.error(error);
@@ -42,10 +86,50 @@ export default function TopCVHomePage() {
     loadHotJobs();
   }, []);
 
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/categories");
+        if (!res.ok) {
+          throw new Error("Không tải được danh mục ngành nghề");
+        }
+        setCategories(await res.json());
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadCategories();
+  }, []);
+
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    if (searchTitle.trim()) params.set("search", searchTitle.trim());
+    if (selectedCategory) params.set("category", selectedCategory);
+    if (selectedSalary) params.set("salary", selectedSalary);
+    if (selectedLocation) params.set("location", selectedLocation);
+
+    const query = params.toString();
+    router.push(query ? `/jobs?${query}` : "/jobs");
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    const params = new URLSearchParams();
+    if (categoryId) params.set("category", categoryId);
+    if (searchTitle.trim()) params.set("search", searchTitle.trim());
+    if (selectedSalary) params.set("salary", selectedSalary);
+    if (selectedLocation) params.set("location", selectedLocation);
+
+    const query = params.toString();
+    router.push(query ? `/jobs?${query}` : "/jobs");
+  };
+
   return (
     <div style={{ backgroundColor: "#f4f6f9", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", color: "#334155" }}>
       
-      {/* SECTION 1: HERO SEARCH BACKGROUND (GRADIENT XANH ĐẬM SANG TRỌNG) */}
+      {/* SECTION 1: HERO SEARCH BACKGROUND */}
       <div style={{ background: "linear-gradient(135deg, #064e3b 0%, #10b981 100%)", padding: "50px 20px 70px 20px", textAlign: "center", position: "relative" }}>
         <h1 style={{ color: "#ffffff", fontSize: "26px", fontWeight: "700", marginBottom: "12px", margin: 0, letterSpacing: "-0.02em" }}>
           Tìm việc làm nhanh 24h, việc làm mới nhất trên toàn quốc
@@ -54,14 +138,15 @@ export default function TopCVHomePage() {
           Tiếp cận <strong style={{ color: "#ffffff" }}>80.000+</strong> tin tuyển dụng việc làm mới mỗi ngày từ hàng nghìn doanh nghiệp uy tín tại Việt Nam
         </p>
 
-        {/* THANH TÌM KIẾM ĐƯỢC ĐỔ BÓNG TRONG SUỐT NỔI BẬT */}
-        <div style={{ 
-          maxWidth: "960px", 
-          margin: "0 auto", 
-          backgroundColor: "#ffffff", 
-          padding: "10px", 
-          borderRadius: "100px", 
-          display: "flex", 
+        {/* THANH TÌM KIẾM HERO */}
+        <form onSubmit={handleSearch} style={{
+          maxWidth: "960px",
+          margin: "0 auto",
+          backgroundColor: "#ffffff",
+          padding: "10px",
+          borderRadius: "18px",
+          display: "flex",
+          flexWrap: "wrap",
           alignItems: "center", 
           gap: "12px", 
           boxShadow: isSearchFocused ? "0 20px 25px -5px rgba(0,0,0,0.4), 0 0 0 4px rgba(16, 185, 129, 0.3)" : "0 10px 25px -5px rgba(0,0,0,0.25)",
@@ -69,7 +154,7 @@ export default function TopCVHomePage() {
         }}>
           
           {/* Ô nhập từ khóa */}
-          <div style={{ flex: 2, display: "flex", alignItems: "center", paddingLeft: "20px" }}>
+          <div style={{ flex: "2 1 240px", display: "flex", alignItems: "center", paddingLeft: "12px" }}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="#10b981" style={{ width: "20px", height: "20px", marginRight: "10px" }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.601Z" />
             </svg>
@@ -80,71 +165,139 @@ export default function TopCVHomePage() {
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
               onChange={(e) => setSearchTitle(e.target.value)}
+              aria-label="Từ khóa hoặc tên công ty"
               style={{ width: "100%", border: "none", outline: "none", fontSize: "14px", color: "#1e293b", fontWeight: "500" }}
             />
           </div>
 
-          {/* Thanh vạch đứng phân tách */}
-          <div style={{ width: "1px", height: "28px", backgroundColor: "#e2e8f0" }}></div>
+          <select
+            aria-label="Vị trí"
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{ flex: "1 1 150px", minWidth: 0, padding: "12px", border: "1px solid #e2e8f0", borderRadius: "10px", backgroundColor: "#fff", color: "#475569", fontSize: "14px" }}
+          >
+            <option value="">Tất cả vị trí</option>
+            {categories.map((category) => (
+              <option key={category._id} value={category._id}>{category.name}</option>
+            ))}
+          </select>
 
-          {/* Dropdown địa điểm mô phỏng */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", cursor: "pointer", color: "#475569" }}
-               onMouseEnter={(e) => (e.currentTarget.style.color = "#10b981")}
-               onMouseLeave={(e) => (e.currentTarget.style.color = "#475569")}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: "18px", height: "18px" }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25a7.5 7.5 0 1 1 15 0Z" />
-              </svg>
-              <span style={{ fontSize: "14px", fontWeight: "500" }}>Tất cả địa điểm</span>
-            </div>
-            <span style={{ fontSize: "11px", color: "#94a3b8" }}>▼</span>
-          </div>
+          <select
+            aria-label="Mức lương"
+            value={selectedSalary}
+            onChange={(e) => setSelectedSalary(isSalaryRange(e.target.value) ? e.target.value : "")}
+            style={{ flex: "1 1 150px", minWidth: 0, padding: "12px", border: "1px solid #e2e8f0", borderRadius: "10px", backgroundColor: "#fff", color: "#475569", fontSize: "14px" }}
+          >
+            <option value="">Mọi mức lương</option>
+            {SALARY_RANGES.map((range) => (
+              <option key={range.value} value={range.value}>{range.label}</option>
+            ))}
+          </select>
 
-          {/* Nút Tìm Kiếm bo tròn lớn */}
-          <button style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", padding: "12px 36px", borderRadius: "100px", fontWeight: "600", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 4px 6px -1px rgba(16, 185, 129, 0.3)", transition: "background 0.2s" }}
+          <select
+            aria-label="Khu vực làm việc"
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
+            style={{ flex: "1 1 150px", minWidth: 0, padding: "12px", border: "1px solid #e2e8f0", borderRadius: "10px", backgroundColor: "#fff", color: "#475569", fontSize: "14px" }}
+          >
+            <option value="">Tất cả khu vực</option>
+            {locations.map((location) => (
+              <option key={location} value={location}>{location}</option>
+            ))}
+          </select>
+
+          <button type="submit" style={{ backgroundColor: "#10b981", color: "#ffffff", border: "none", padding: "12px 24px", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 4px 6px -1px rgba(16, 185, 129, 0.3)", transition: "background 0.2s" }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#047857")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#10b981")}>
             Tìm kiếm
           </button>
-        </div>
+        </form>
       </div>
 
       {/* SECTION 2: CONTAINER CHÍNH */}
-      <div style={{ maxWidth: "1240px", margin: "-35px auto 40px auto", padding: "0 20px", display: "grid", gridTemplateColumns: "280px 1fr", gap: "24px" }}>
+      <div style={{ maxWidth: "1240px", margin: "30px auto 40px auto", padding: "0 20px", display: "flex", flexDirection: "column", gap: "24px" }}>
         
-        {/* Menu danh mục ngành nghề tinh tế */}
-        <div style={{ backgroundColor: "#ffffff", borderRadius: "16px", padding: "16px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #f1f5f9" }}>
-          <h3 style={{ fontSize: "15px", fontWeight: "700", color: "#0f172a", padding: "0 8px 12px 8px", margin: 0, borderBottom: "2px solid #f1f5f9", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ color: "#10b981" }}>☰</span> Danh mục ngành nghề
-          </h3>
-          <div style={{ marginTop: "8px" }}>
-            {["Kinh doanh / Bán hàng", "Marketing / PR / Quảng cáo", "Chăm sóc khách hàng", "Nhân sự / Hành chính", "Công nghệ Thông tin", "Lao động phổ thông"].map((item, idx) => (
-              <div key={idx} style={{ padding: "12px 12px", fontSize: "13px", fontWeight: "600", borderBottom: "1px solid #f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", borderRadius: "8px", color: "#475569", transition: "all 0.15s" }}
-                   onMouseEnter={(e) => {
-                     e.currentTarget.style.backgroundColor = "#f0fdf4";
-                     e.currentTarget.style.color = "#10b981";
-                   }}
-                   onMouseLeave={(e) => {
-                     e.currentTarget.style.backgroundColor = "transparent";
-                     e.currentTarget.style.color = "#475569";
-                   }}>
-                <span>{item}</span>
-                <span style={{ color: "#cbd5e1", fontSize: "11px" }}>❯</span>
-              </div>
-            ))}
+        {/* 🌟 CẢI TIẾN: THANH DROPDOWN DANH MỤC NGÀNH NGHỀ HIỆN ĐẠI */}
+        <div style={{ backgroundColor: "#ffffff", borderRadius: "16px", padding: "20px 24px", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ width: "40px", height: "40px", borderRadius: "10px", backgroundColor: "#ecfdf5", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: "700" }}>
+              📂
+            </div>
+            <div>
+              <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#0f172a", margin: 0 }}>
+                Khám phá theo ngành nghề
+              </h3>
+              <p style={{ fontSize: "13px", color: "#64748b", margin: "2px 0 0 0" }}>
+                Lựa chọn ngành nghề phù hợp để xem các việc làm tuyển dụng hàng đầu
+              </p>
+            </div>
+          </div>
+
+          {/* DROPDOWN SELECT DANH MỤC */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: "1 1 300px", maxWidth: "450px" }}>
+            <select
+              aria-label="Chọn danh mục ngành nghề"
+              value={selectedCategory}
+              onChange={(e) => handleCategorySelect(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "12px",
+                border: "1.5px solid #cbd5e1",
+                backgroundColor: "#f8fafc",
+                fontSize: "14px",
+                fontWeight: "600",
+                color: "#1e293b",
+                outline: "none",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "#10b981")}
+              onBlur={(e) => (e.target.style.borderColor = "#cbd5e1")}
+            >
+              <option value="">-- Tất cả ngành nghề ({categories.length}) --</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  💼 {category.name}
+                </option>
+              ))}
+            </select>
+
+            {selectedCategory && (
+              <button type="button"
+                onClick={() => handleCategorySelect("")}
+                style={{
+                  backgroundColor: "#f1f5f9",
+                  color: "#64748b",
+                  border: "none",
+                  padding: "12px 16px",
+                  borderRadius: "12px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Xóa lọc ✕
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Banner lớn thời thượng */}
-        <div style={{ backgroundColor: "#fff", borderRadius: "16px", overflow: "hidden", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", height: "320px", display: "flex", alignItems: "center", background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)", border: "1px solid #e2e8f0", padding: "40px" }}>
-          <div style={{ maxWidth: "550px", textAlign: "left" }}>
+        {/* BANNER NỔI BẬT */}
+        <div style={{ minWidth: 0, boxSizing: "border-box", backgroundColor: "#fff", borderRadius: "16px", overflow: "hidden", boxShadow: "0 4px 20px -2px rgba(0,0,0,0.05)", minHeight: "260px", display: "flex", alignItems: "center", background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)", border: "1px solid #e2e8f0", padding: "clamp(20px, 4vw, 40px)" }}>
+          <div style={{ maxWidth: "600px", minWidth: 0, textAlign: "left" }}>
             <span style={{ background: "#10b981", color: "#fff", padding: "6px 14px", borderRadius: "30px", fontSize: "11px", fontWeight: "700", letterSpacing: "0.05em" }}>TIN TUYỂN DỤNG TIÊU BIỂU</span>
-            <h2 style={{ fontSize: "30px", color: "#0f172a", fontWeight: "800", marginTop: "16px", marginBottom: "8px", lineHeight: "1.2" }}>CƠ HỘI VIỆC LÀM ĐÓN ĐẦU XU HƯỚNG 2026</h2>
+            <h2 style={{ fontSize: "28px", color: "#0f172a", fontWeight: "800", marginTop: "16px", marginBottom: "8px", lineHeight: "1.2" }}>CƠ HỘI VIỆC LÀM ĐÓN ĐẦU XU HƯỚNG 2026</h2>
             <p style={{ color: "#64748b", fontSize: "15px", lineHeight: "1.5", marginBottom: "24px" }}>Gia nhập mạng lưới đối tác chiến lược để nhận gói đặc quyền thu nhập và lộ trình thăng tiến rõ ràng vượt bậc.</p>
-            <button style={{ background: "#0f172a", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: "pointer", transition: "all 0.2s" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}>
+            <button
+              type="button"
+              onClick={() => router.push("/jobs")}
+              style={{ background: "#0f172a", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: "pointer", transition: "all 0.2s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}
+            >
               Ứng tuyển ngay ↗
             </button>
           </div>
@@ -153,7 +306,7 @@ export default function TopCVHomePage() {
 
       {/* SECTION 3: GRID DANH SÁCH VIỆC LÀM TỐT NHẤT */}
       <div style={{ maxWidth: "1240px", margin: "0 auto 60px auto", padding: "0 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ width: "4px", height: "24px", backgroundColor: "#10b981", borderRadius: "10px" }}></div>
             <h2 style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>Việc làm tốt nhất</h2>
@@ -161,8 +314,8 @@ export default function TopCVHomePage() {
           </div>
         </div>
 
-        {/* THIẾT KẾ CARD CHI TIẾT GIỐNG 90% TOPCV */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "20px" }}>
+        {/* GRID CARD CÔNG VIỆC */}
+        <div className="home-job-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px", minWidth: 0 }}>
           {isLoadingJobs ? (
             <div style={{ gridColumn: "1 / -1", padding: "40px", textAlign: "center", color: "#64748b" }}>
               Đang tải việc làm tốt nhất...
@@ -177,7 +330,19 @@ export default function TopCVHomePage() {
                 key={job.id}
                 onMouseEnter={() => setHoveredJob(job.id)}
                 onMouseLeave={() => setHoveredJob(null)}
+                onClick={() => router.push(`/jobs/${job.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    router.push(`/jobs/${job.id}`);
+                  }
+                }}
+                role="link"
+                tabIndex={0}
+                aria-label={`Xem công việc ${job.title}`}
                 style={{ 
+                  boxSizing: "border-box",
+                  minWidth: 0,
                   backgroundColor: "#ffffff", 
                   padding: "20px", 
                   borderRadius: "16px", 
@@ -191,7 +356,7 @@ export default function TopCVHomePage() {
                   gap: "16px"
                 }}
               >
-                {/* Ảnh đại diện logo giả lập bên trái Card */}
+                {/* Logo công ty giả lập */}
                 <div style={{ 
                   width: "52px", 
                   height: "52px", 
@@ -209,7 +374,7 @@ export default function TopCVHomePage() {
                   {job.logoText}
                 </div>
 
-                {/* Khu vực thông tin chi tiết */}
+                {/* Chi tiết công việc */}
                 <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flexGrow: 1, minWidth: 0 }}>
                   <div>
                     <h3 style={{ 
@@ -231,12 +396,12 @@ export default function TopCVHomePage() {
                     </p>
                   </div>
 
-                  {/* Phần Tag lương & Địa điểm */}
-                  <div style={{ display: "flex", gap: "8px", fontSize: "12px" }}>
-                    <span style={{ color: "#10b981", fontWeight: "700", backgroundColor: "#f0fdf4", padding: "4px 10px", borderRadius: "6px" }}>
+                  {/* Lương & Địa điểm */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", fontSize: "12px" }}>
+                    <span style={{ minWidth: 0, color: "#10b981", fontWeight: "700", backgroundColor: "#f0fdf4", padding: "4px 10px", borderRadius: "6px" }}>
                       💵 {job.salary}
                     </span>
-                    <span style={{ color: "#475569", backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "6px", fontWeight: "500" }}>
+                    <span style={{ color: "#475569", backgroundColor: "#f1f5f9", padding: "4px 10px", borderRadius: "6px", fontWeight: "500", overflowWrap: "anywhere" }}>
                       📍 {job.location}
                     </span>
                   </div>
@@ -246,6 +411,18 @@ export default function TopCVHomePage() {
             ))
           )}
         </div>
+
+        {!isLoadingJobs && hotJobs.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "28px" }}>
+            <button
+              type="button"
+              onClick={() => router.push("/jobs")}
+              style={{ backgroundColor: "#10b981", color: "#fff", border: "none", padding: "12px 28px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 10px rgba(16,185,129,0.2)" }}
+            >
+              Xem thêm công việc
+            </button>
+          </div>
+        )}
       </div>
 
     </div>

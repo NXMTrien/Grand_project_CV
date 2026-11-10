@@ -25,11 +25,17 @@ interface ResumeData {
 interface ApplicationItem {
   _id: string;
   coverLetter?: string;
-  status: "SENT" | "REVIEWING" | "INTERVIEW" | "REJECTED";
+  status: ApplicationStatus;
   createdAt: string;
   jobId?: { _id: string; title: string; location?: string };
   userId?: { _id: string; fullName: string; email: string; phone?: string };
   resumeId?: ResumeData;
+}
+
+type ApplicationStatus = "SENT" | "REVIEWING" | "INTERVIEW" | "REJECTED";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export default function EmployerApplicationsPage() {
@@ -37,22 +43,21 @@ export default function EmployerApplicationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState("");
+  const [companyName, setCompanyName] = useState("");
 
   // State cho Modal xem thông tin CV Online & Cover Letter
   const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null);
 
-  useEffect(() => {
-    fetchApplications();
-  }, []);
-
-  const fetchApplications = async () => {
+  const fetchApplications = async (selectedCompanyId = "") => {
     setLoading(true);
     setError("");
     try {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Vui lòng đăng nhập tài khoản Nhà tuyển dụng");
 
-      const res = await fetch("/api/employer/applications", {
+      const query = selectedCompanyId ? `?companyId=${encodeURIComponent(selectedCompanyId)}` : "";
+      const res = await fetch(`/api/employer/applications${query}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -60,14 +65,24 @@ export default function EmployerApplicationsPage() {
       if (!res.ok) throw new Error(data.message || "Không thể tải danh sách ứng viên");
 
       setApplications(data.data || []);
-    } catch (err: any) {
-      setError(err.message || "Lỗi kết nối");
+    } catch (err) {
+      setError(getErrorMessage(err, "Lỗi kết nối"));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const params = new URLSearchParams(window.location.search);
+      const selectedCompanyId = params.get("companyId") || "";
+      setCompanyName(params.get("companyName") || "");
+      setCompanyId(selectedCompanyId);
+      return fetchApplications(selectedCompanyId);
+    });
+  }, []);
+
+  const handleStatusChange = async (applicationId: string, newStatus: ApplicationStatus) => {
     setUpdatingId(applicationId);
     try {
       const token = localStorage.getItem("token");
@@ -85,11 +100,11 @@ export default function EmployerApplicationsPage() {
 
       setApplications((prev) =>
         prev.map((item) =>
-          item._id === applicationId ? { ...item, status: newStatus as any } : item
+          item._id === applicationId ? { ...item, status: newStatus } : item
         )
       );
-    } catch (err: any) {
-      alert(err.message || "Lỗi khi đổi trạng thái");
+    } catch (err) {
+      alert(getErrorMessage(err, "Lỗi khi đổi trạng thái"));
     } finally {
       setUpdatingId(null);
     }
@@ -115,7 +130,9 @@ export default function EmployerApplicationsPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex justify-between items-center border-b pb-5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Quản lý Hồ sơ Ứng tuyển</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {companyId ? `Kiểm tra ứng viên${companyName ? ` - ${companyName}` : ""}` : "Quản lý Hồ sơ Ứng tuyển"}
+            </h1>
             <p className="text-sm text-gray-500 mt-1">
               Danh sách ứng viên nộp bài theo cả dạng CV Đính kèm & CV Online.
             </p>
@@ -212,7 +229,7 @@ export default function EmployerApplicationsPage() {
                           <select
                             value={item.status}
                             disabled={updatingId === item._id}
-                            onChange={(e) => handleStatusChange(item._id, e.target.value)}
+                            onChange={(e) => handleStatusChange(item._id, e.target.value as ApplicationStatus)}
                             className="text-xs border rounded-lg p-1.5 outline-none bg-white shadow-sm font-medium focus:ring-2 focus:ring-emerald-500"
                           >
                             <option value="SENT">SENT (Mới nộp)</option>

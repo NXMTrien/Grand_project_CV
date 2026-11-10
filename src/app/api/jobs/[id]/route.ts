@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const job = await Job.findById(jobId)
-      .populate("companyId", "name logo website address")
+      .populate("companyId", "name logo website address scale")
       .populate("categoryId", "name slug")
       .populate("managerId", "fullName role");
 
@@ -27,8 +27,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({ success: true, data: job }, { status: 200 });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Không thể tải thông tin công việc";
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
@@ -50,8 +51,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({ success: true, message: `Đã cập nhật bài đăng ${jobId}`, data: updatedJob }, { status: 200 });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Không thể cập nhật công việc";
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
@@ -72,7 +74,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     return NextResponse.json({ success: true, message: `Đã xóa bài đăng ${jobId} thành công`, data: deletedJob }, { status: 200 });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Không thể xóa công việc";
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

@@ -29,6 +29,11 @@ const JobSchema = new Schema(
       enum: ["PENDING", "APPROVED", "REJECTED", "EXPIRED"], 
       default: "PENDING" // Chờ Admin duyệt khi mới đăng
     },
+    hiringStatus: {
+      type: String,
+      enum: ["OPEN", "CLOSED"],
+      default: "OPEN",
+    },
     views: { type: Number, default: 0 },                 // Thống kê lượt xem tin
     deadline: { type: Date, required: true }             // Hạn nộp hồ sơ
   },
