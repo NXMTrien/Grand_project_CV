@@ -32,7 +32,7 @@ interface ApplicationItem {
   resumeId?: ResumeData;
 }
 
-type ApplicationStatus = "SENT" | "REVIEWING" | "INTERVIEW" | "REJECTED";
+type ApplicationStatus = "SENT" | "REVIEWING" | "INTERVIEW" | "APPROVED" | "REJECTED";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -49,7 +49,7 @@ export default function EmployerApplicationsPage() {
   // State cho Modal xem thông tin CV Online & Cover Letter
   const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null);
 
-  const fetchApplications = async (selectedCompanyId = "") => {
+  const fetchApplications = async (selectedCompanyId = "", selectedApplicationId = "") => {
     setLoading(true);
     setError("");
     try {
@@ -64,7 +64,11 @@ export default function EmployerApplicationsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Không thể tải danh sách ứng viên");
 
-      setApplications(data.data || []);
+      const items = data.data || [];
+      setApplications(items);
+      if (selectedApplicationId) {
+        setSelectedApp(items.find((item: ApplicationItem) => item._id === selectedApplicationId) || null);
+      }
     } catch (err) {
       setError(getErrorMessage(err, "Lỗi kết nối"));
     } finally {
@@ -78,7 +82,7 @@ export default function EmployerApplicationsPage() {
       const selectedCompanyId = params.get("companyId") || "";
       setCompanyName(params.get("companyName") || "");
       setCompanyId(selectedCompanyId);
-      return fetchApplications(selectedCompanyId);
+      return fetchApplications(selectedCompanyId, params.get("applicationId") || "");
     });
   }, []);
 
@@ -117,6 +121,7 @@ export default function EmployerApplicationsPage() {
       case "REVIEWING":
         return "bg-amber-100 text-amber-800 border-amber-200";
       case "INTERVIEW":
+      case "APPROVED":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "REJECTED":
         return "bg-rose-100 text-rose-800 border-rose-200";
@@ -235,6 +240,7 @@ export default function EmployerApplicationsPage() {
                             <option value="SENT">SENT (Mới nộp)</option>
                             <option value="REVIEWING">REVIEWING (Đang duyệt)</option>
                             <option value="INTERVIEW">INTERVIEW (Mời phỏng vấn)</option>
+                            <option value="APPROVED">APPROVED (Đã chấp thuận)</option>
                             <option value="REJECTED">REJECTED (Từ chối)</option>
                           </select>
                         </td>
@@ -253,7 +259,7 @@ export default function EmployerApplicationsPage() {
             <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-xl">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="text-xl font-bold text-gray-800">
-                  CV Online: {selectedApp.resumeId?.title}
+                  Hồ sơ ứng viên: {selectedApp.userId?.fullName || "Chưa rõ"}
                 </h3>
                 <button
                   onClick={() => setSelectedApp(null)}
@@ -268,6 +274,17 @@ export default function EmployerApplicationsPage() {
                   <h4 className="font-bold text-amber-800 text-sm mb-1">Thư xin việc (Cover Letter):</h4>
                   <p className="text-sm text-amber-900 whitespace-pre-line">{selectedApp.coverLetter}</p>
                 </div>
+              )}
+
+              {selectedApp.resumeId?.type === "ATTACHMENT" && selectedApp.resumeId.fileUrl && (
+                <a
+                  href={selectedApp.resumeId.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Mở CV đính kèm: {selectedApp.resumeId.title}
+                </a>
               )}
 
               {selectedApp.resumeId?.cvData ? (

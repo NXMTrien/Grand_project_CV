@@ -1,45 +1,32 @@
-// app/api/employer/applications/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
+import { getAuthPayload } from "@/src/lib/auth";
 import Application from "@/src/models/Application";
 import Job from "@/src/models/Job";
 import Company from "@/src/models/Company";
-import "@/src/models/User";
-import "@/src/models/Resume"; // Khai báo model Resume
-import jwt from "jsonwebtoken";
+import Notification from "@/src/models/Notification";
+import User from "@/src/models/User";
+import "@/src/models/Resume";
 import mongoose from "mongoose";
 
-interface JwtPayload {
-  userId: string;
-  role: string;
+async function getManager(request: Request) {
+  const auth = getAuthPayload(request.headers);
+  if (!auth?.userId || !mongoose.Types.ObjectId.isValid(auth.userId)) {
+    return { error: "Vui lòng đăng nhập tài khoản nhà tuyển dụng.", status: 401 as const };
+  }
+  const manager = await User.findById(auth.userId).select("role isBlocked");
+  if (!manager || manager.role !== "MANAGER" || manager.isBlocked) {
+    return { error: "Bạn không có quyền truy cập hồ sơ ứng tuyển.", status: 403 as const };
+  }
+  return { manager };
 }
 
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-
-    const authHeader = request.headers.get("Authorization");
-    let employerId = request.headers.get("x-employer-id");
-
-    if (!employerId && authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.split(" ")[1];
-      const jwtSecret = process.env.JWT_SECRET || "YourSecretKeyHere";
-      try {
-        const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
-        employerId = decoded.userId;
-      } catch {
-        return NextResponse.json(
-          { success: false, message: "Token không hợp lệ hoặc đã hết hạn!" },
-          { status: 401 }
-        );
-      }
-    }
-
-    if (!employerId || !mongoose.Types.ObjectId.isValid(employerId)) {
-      return NextResponse.json(
-        { success: false, message: "Bạn không có quyền truy cập dữ liệu này!" },
-        { status: 403 }
-      );
+    const auth = await getManager(request);
+    if (auth.error) {
+      return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
     const companyId = request.nextUrl.searchParams.get("companyId");
@@ -53,7 +40,7 @@ export async function GET(request: NextRequest) {
     if (companyId) {
       const ownedCompany = await Company.exists({
         _id: companyId,
-        createdBy: employerId,
+        createdBy: auth.manager._id,
       });
       if (!ownedCompany) {
         return NextResponse.json(
@@ -63,30 +50,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Lấy các bài đăng tuyển dụng do NTD quản lý
     const employerJobs = await Job.find({
-      managerId: employerId,
+      managerId: auth.manager._id,
       ...(companyId ? { companyId } : {}),
-    }).select("_id title");
-    const jobIds = employerJobs.map((j) => j._id);
-
-    if (jobIds.length === 0) {
-      return NextResponse.json({ success: true, total: 0, data: [] }, { status: 200 });
-    }
-
-    // Populated chi tiết CV theo đúng Schema Resume
-    const applications = await Application.find({ jobId: { $in: jobIds } })
-      .populate({
-        path: "jobId",
-        select: "title location salaryMin salaryMax",
-      })
-      .populate({
-        path: "userId",
-        select: "fullName email phone avatar",
-      })
+    }).select("_id");
+    const applications = await Application.find({
+      jobId: { $in: employerJobs.map((job) => job._id) },
+    })
+      .populate({ path: "jobId", select: "title location salaryMin salaryMax" })
+      .populate({ path: "userId", select: "fullName email phone avatar" })
       .populate({
         path: "resumeId",
-        select: "title type fileUrl cvData templateName isPublic updatedAt", // ⚡ Chọn đầy đủ thông tin CV
+        select: "title type fileUrl cvData templateName isPublic updatedAt",
       })
       .sort({ createdAt: -1 });
 
@@ -95,12 +70,9 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("❌ LỖI GET EMPLOYER APPLICATIONS:", error);
+    console.error("Không thể tải hồ sơ ứng tuyển cho nhà tuyển dụng:", error);
     return NextResponse.json(
-      {
-        success: false,
-        message: error instanceof Error ? error.message : "Không thể tải hồ sơ ứng tuyển.",
-      },
+      { success: false, message: "Không thể tải hồ sơ ứng tuyển." },
       { status: 500 }
     );
   }
@@ -109,33 +81,78 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     await connectDB();
+    const auth = await getManager(request);
+    if (auth.error) {
+      return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
+    }
+
     const body = await request.json();
     const { applicationId, status } = body;
-
     if (!applicationId || !mongoose.Types.ObjectId.isValid(applicationId)) {
-      return NextResponse.json({ success: false, message: "ID hồ sơ không hợp lệ" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "ID hồ sơ không hợp lệ." },
+        { status: 400 }
+      );
     }
-
-    const validStatuses = ["SENT", "REVIEWING", "INTERVIEW", "REJECTED"];
+    const validStatuses = ["SENT", "REVIEWING", "INTERVIEW", "APPROVED", "REJECTED"];
     if (!validStatuses.includes(status)) {
-      return NextResponse.json({ success: false, message: "Trạng thái không hợp lệ" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Trạng thái không hợp lệ." },
+        { status: 400 }
+      );
     }
 
-    const updatedApp = await Application.findByIdAndUpdate(
-      applicationId,
-      { status },
-      { new: true }
-    );
+    const application = await Application.findById(applicationId);
+    if (!application) {
+      return NextResponse.json(
+        { success: false, message: "Không tìm thấy hồ sơ." },
+        { status: 404 }
+      );
+    }
 
-    if (!updatedApp) {
-      return NextResponse.json({ success: false, message: "Không tìm thấy hồ sơ" }, { status: 404 });
+    const job = await Job.findOne({ _id: application.jobId, managerId: auth.manager._id })
+      .select("title");
+    if (!job) {
+      return NextResponse.json(
+        { success: false, message: "Bạn không có quyền cập nhật hồ sơ này." },
+        { status: 403 }
+      );
+    }
+
+    const previousStatus = application.status;
+    let approvalNotificationId: mongoose.Types.ObjectId | null = null;
+    if (status === "APPROVED" && previousStatus !== "APPROVED") {
+      const notification = await Notification.create({
+        recipientId: application.userId,
+        type: "APPLICATION_APPROVED",
+        title: "Hồ sơ ứng tuyển đã được chấp thuận",
+        message: "Nhà tuyển dụng sẽ liên hệ với bạn trong thời gian tới. Cảm ơn bạn đã chọn công ty",
+        href: "/my-resumes",
+        relatedApplicationId: application._id,
+      });
+      approvalNotificationId = notification._id;
+    }
+
+    application.status = status;
+    try {
+      await application.save();
+    } catch (saveError) {
+      if (approvalNotificationId) {
+        await Notification.deleteOne({ _id: approvalNotificationId });
+      }
+      throw saveError;
     }
 
     return NextResponse.json(
-      { success: true, message: `Đã cập nhật trạng thái: ${status}`, data: updatedApp },
+      {
+        success: true,
+        message: `Đã cập nhật trạng thái: ${status}`,
+        data: application,
+      },
       { status: 200 }
     );
   } catch (error) {
+    console.error("Không thể cập nhật hồ sơ ứng tuyển:", error);
     return NextResponse.json(
       {
         success: false,

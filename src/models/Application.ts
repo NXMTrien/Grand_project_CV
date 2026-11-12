@@ -1,4 +1,4 @@
-import mongoose, { Schema, model, models } from "mongoose";
+import { Schema, model, models } from "mongoose";
 
 const ApplicationSchema = new Schema(
   {
@@ -6,7 +6,11 @@ const ApplicationSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // Ứng viên nộp bài
     resumeId: { type: Schema.Types.ObjectId, ref: "Resume", required: true }, // CV được chọn để nộp
     coverLetter: { type: String, default: "" },
-    status: { type: String, enum: ["SENT", "REVIEWING", "INTERVIEW", "REJECTED"], default: "SENT" }
+    status: {
+      type: String,
+      enum: ["SENT", "REVIEWING", "INTERVIEW", "APPROVED", "REJECTED"],
+      default: "SENT",
+    }
   },
   { timestamps: true } 
 );

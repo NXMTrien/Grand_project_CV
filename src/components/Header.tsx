@@ -2,14 +2,34 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Bell } from "lucide-react";
+
+interface NotificationItem {
+  _id: string;
+  title: string;
+  message: string;
+  href: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface HeaderUser {
+  fullName?: string;
+  name?: string;
+  role?: string;
+  avatar?: string;
+  email?: string;
+}
 
 export default function Header() {
   const systemNameLeft = "Grand";
   const systemNameRight = "Job";
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<HeaderUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // 🔽 State điều khiển Menu thả xuống
   const [showAdminUserDropdown, setShowAdminUserDropdown] = useState<boolean>(false);
@@ -23,10 +43,15 @@ export default function Header() {
     const storedUser = localStorage.getItem("user");
 
     setToken(storedToken);
+    if (!storedToken) {
+      setNotifications([]);
+      setShowNotifications(false);
+    }
 
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser: unknown = JSON.parse(storedUser);
+        setUser(parsedUser && typeof parsedUser === "object" ? parsedUser as HeaderUser : null);
       } catch (err) {
         console.error("Lỗi parse user từ localStorage:", err);
         setUser(null);
@@ -37,7 +62,7 @@ export default function Header() {
   };
 
   useEffect(() => {
-    loadAuthData();
+    void Promise.resolve().then(loadAuthData);
 
     const handleStorageChange = () => loadAuthData();
 
@@ -49,6 +74,31 @@ export default function Header() {
       window.removeEventListener("auth-change", handleStorageChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let active = true;
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch("/api/notifications", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Không thể tải thông báo.");
+        if (active) setNotifications(result.data || []);
+      } catch (error) {
+        console.error("Không thể tải thông báo:", error);
+      }
+    };
+
+    void fetchNotifications();
+    const intervalId = window.setInterval(fetchNotifications, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [token]);
 
   // 🚪 XỬ LÝ ĐĂNG XUẤT
   const handleLogout = () => {
@@ -159,6 +209,15 @@ export default function Header() {
             style={navLinkStyle("home")}
           >
             Trang chủ
+          </Link>
+          <Link
+            href="/contact"
+            id="contact"
+            onMouseEnter={() => setHoveredLink("contact")}
+            onMouseLeave={() => setHoveredLink(null)}
+            style={navLinkStyle("contact")}
+          >
+            Liên hệ
           </Link>
 
           {/* 👑 ROLE: ADMIN */}
@@ -276,6 +335,28 @@ export default function Header() {
                     >
                       Quản lý Danh Mục 
                     </Link>
+                    <Link
+                      href="/admin-panel/feedback"
+                      style={{
+                        display: "block",
+                        padding: "8px 16px",
+                        fontSize: "13px",
+                        fontWeight: "500",
+                        color: "#334155",
+                        textDecoration: "none",
+                        transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f0fdf4";
+                        e.currentTarget.style.color = "#10b981";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "#334155";
+                      }}
+                    >
+                      Kiểm tra phản ánh
+                    </Link>
                   </div>
                 )}
               </div>
@@ -315,7 +396,7 @@ export default function Header() {
                 Công ty
               </Link>
               <Link
-                href="applications"
+                href="/applications"
                 id="hr-applicants"
                 onMouseEnter={() => setHoveredLink("hr-applicants")}
                 onMouseLeave={() => setHoveredLink(null)}
@@ -354,6 +435,127 @@ export default function Header() {
         {/* THÔNG TIN KHÁCH / USER (DROPDOWN AVATAR) */}
         <div style={{ display: "flex", alignItems: "center", width: "25%", justifyContent: "flex-end" }}>
           {isLoggedIn ? (
+            <>
+            <div style={{ position: "relative", marginRight: "12px" }}>
+              <button
+                type="button"
+                aria-label={`Thông báo (${notifications.filter((item) => !item.isRead).length} chưa đọc)`}
+                aria-expanded={showNotifications}
+                onClick={() => setShowNotifications((shown) => !shown)}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "38px",
+                  height: "38px",
+                  color: "#475569",
+                  background: showNotifications ? "#f1f5f9" : "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "50%",
+                  cursor: "pointer",
+                }}
+              >
+                <Bell size={18} />
+                {notifications.some((item) => !item.isRead) && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "-4px",
+                      right: "-4px",
+                      minWidth: "17px",
+                      height: "17px",
+                      padding: "0 4px",
+                      borderRadius: "999px",
+                      background: "#ef4444",
+                      color: "#ffffff",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      lineHeight: "17px",
+                    }}
+                  >
+                    {Math.min(notifications.filter((item) => !item.isRead).length, 9)}
+                  </span>
+                )}
+              </button>
+              {showNotifications && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "48px",
+                    right: 0,
+                    zIndex: 110,
+                    width: "min(360px, calc(100vw - 32px))",
+                    maxHeight: "420px",
+                    overflowY: "auto",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    background: "#ffffff",
+                    boxShadow: "0 12px 30px rgba(15, 23, 42, 0.16)",
+                  }}
+                >
+                  <div style={{ padding: "13px 16px", borderBottom: "1px solid #f1f5f9", fontWeight: 700, color: "#0f172a" }}>
+                    Thông báo
+                  </div>
+                  {notifications.length === 0 ? (
+                    <p style={{ margin: 0, padding: "20px 16px", color: "#64748b", fontSize: "13px" }}>
+                      Bạn chưa có thông báo.
+                    </p>
+                  ) : (
+                    notifications.map((item) => (
+                      <Link
+                        key={item._id}
+                        href={item.href}
+                        onClick={() => {
+                          setShowNotifications(false);
+                          if (!item.isRead) {
+                            setNotifications((current) =>
+                              current.map((notification) =>
+                                notification._id === item._id ? { ...notification, isRead: true } : notification
+                              )
+                            );
+                            void fetch("/api/notifications", {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({ notificationId: item._id }),
+                            }).then(async (response) => {
+                              if (!response.ok) {
+                                const result = await response.json();
+                                throw new Error(result.message || "Không thể cập nhật thông báo.");
+                              }
+                            }).catch((error: unknown) => {
+                              console.error("Không thể đánh dấu thông báo đã đọc:", error);
+                              setNotifications((current) =>
+                                current.map((notification) =>
+                                  notification._id === item._id ? { ...notification, isRead: false } : notification
+                                )
+                              );
+                            });
+                          }
+                        }}
+                        style={{
+                          display: "block",
+                          padding: "12px 16px",
+                          borderBottom: "1px solid #f8fafc",
+                          background: item.isRead ? "#ffffff" : "#f0fdf4",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <span style={{ display: "block", color: "#0f172a", fontSize: "13px", fontWeight: 700 }}>
+                          {item.title}
+                        </span>
+                        <span style={{ display: "block", marginTop: "4px", color: "#475569", fontSize: "12px", lineHeight: 1.5 }}>
+                          {item.message}
+                        </span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <div
               style={{ position: "relative" }}
               onMouseEnter={() => setShowProfileDropdown(true)}
@@ -532,6 +734,7 @@ export default function Header() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <Link
