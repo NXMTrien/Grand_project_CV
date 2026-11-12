@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-// import "@/app/globals.css"; // Đảm bảo đã import Tailwind
+import "@/src/app/globals.css";
 import Header from "@/src/components/Header";
 import Footer from "@/src/components/Footer";
 

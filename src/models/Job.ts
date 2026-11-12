@@ -1,4 +1,7 @@
 import mongoose, { Schema, model, models } from "mongoose";
+import Company from "@/src/models/Company";
+import Category from "@/src/models/Category";
+import User from "@/src/models/User";
 
 const JobSchema = new Schema(
   {
@@ -25,6 +28,11 @@ const JobSchema = new Schema(
       type: String, 
       enum: ["PENDING", "APPROVED", "REJECTED", "EXPIRED"], 
       default: "PENDING" // Chờ Admin duyệt khi mới đăng
+    },
+    hiringStatus: {
+      type: String,
+      enum: ["OPEN", "CLOSED"],
+      default: "OPEN",
     },
     views: { type: Number, default: 0 },                 // Thống kê lượt xem tin
     deadline: { type: Date, required: true }             // Hạn nộp hồ sơ

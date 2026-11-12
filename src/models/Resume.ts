@@ -9,7 +9,15 @@ const ResumeSchema = new Schema(
     
    
     cvData: {
-      summary: { type: String, default: "" },       // Giới thiệu bản thân
+      fullName: { type: String, default: "" },
+      avatar: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      email: { type: String, default: "" },
+      address: { type: String, default: "" },
+      targetPosition: { type: String, default: "" },
+      summary: { type: String, default: "" },
+      technicalSkills: { type: String, default: "" },
+      softSkills: { type: String, default: "" },
       education: [
         {
           school: String,

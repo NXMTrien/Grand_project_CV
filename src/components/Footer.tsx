@@ -49,8 +49,8 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link href="#" id="contact" onMouseEnter={() => setHoveredId("contact")} onMouseLeave={() => setHoveredId(null)} style={linkStyle("contact")}>
-                Liên hệ báo giá
+              <Link href="/contact" id="contact" onMouseEnter={() => setHoveredId("contact")} onMouseLeave={() => setHoveredId(null)} style={linkStyle("contact")}>
+                Liên hệ & phản ánh
               </Link>
             </li>
           </ul>

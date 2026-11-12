@@ -9,7 +9,8 @@ const CompanySchema = new Schema(
     scale: { type: String, default: "10-50 nhân viên" }, 
     description: { type: String, required: true },       
     images: [{ type: String }],                         
-    isVerified: { type: Boolean, default: false }      
+    isVerified: { type: Boolean, default: false } ,
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }     
   },
   { timestamps: true }
 );

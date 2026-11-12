@@ -141,7 +141,7 @@ export default function RegisterPage() {
           style={{ 
             width: "100%", 
             marginTop: "24px", 
-            backgroundColor: loading ? "#cbd5e1" : (isButtonHovered ? "#059669" : "#10b981"), 
+            backgroundColor: loading ? "#cbd5e1" : (isButtonHovered ? "#047857" : "#10b981"), 
             color: "#ffffff", 
             padding: "12px", 
             borderRadius: "8px", 

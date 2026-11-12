@@ -3,14 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4010",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -p 4010",
+    "lint": "eslint",
+    "seed:demo": "node scripts/seed-demo-data.mjs",
+    "seed:manager-jobs": "node scripts/seed-manager-companies-jobs.mjs"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^1.27.0",
     "mongoose": "^9.6.2",
     "next": "16.2.6",
     "next-auth": "^4.24.14",
@@ -19,8 +23,9 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.0",
