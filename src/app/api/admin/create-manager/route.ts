@@ -5,10 +5,14 @@ import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 
+export const runtime = "nodejs";
+
+const mailPort = Number(process.env.MAIL_PORT) || 587;
+
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
-  port: parseInt(process.env.MAIL_PORT || "587"),
-  secure: false,
+  port: mailPort,
+  secure: mailPort === 465,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -32,11 +36,26 @@ export async function POST(req: Request) {
     const token = authHeader.split(" ")[1];
 
     // 2. GIẢI MÃ TOKEN VÀ KIỂM TRA QUYỀN ADMIN TRONG DATABASE
-    let decoded: any;
+    let decoded: string | jwt.JwtPayload;
     try {
       const jwtSecret = process.env.JWT_SECRET || "your_fallback_jwt_secret";
       decoded = jwt.verify(token, jwtSecret);
-    } catch (err) {
+    } catch {
+      return NextResponse.json(
+        { message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!" },
+        { status: 401 }
+      );
+    }
+
+    const userId =
+      typeof decoded === "string"
+        ? null
+        : typeof decoded.id === "string"
+          ? decoded.id
+          : typeof decoded.userId === "string"
+            ? decoded.userId
+            : null;
+    if (!userId) {
       return NextResponse.json(
         { message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!" },
         { status: 401 }
@@ -44,7 +63,7 @@ export async function POST(req: Request) {
     }
 
     // Tìm thông tin người dùng gửi yêu cầu
-    const adminUser = await User.findById(decoded.id || decoded.userId);
+    const adminUser = await User.findById(userId);
 
     // Kiểm tra tài khoản có tồn tại và có quyền ADMIN hay không
     if (!adminUser || adminUser.role !== "ADMIN") {
@@ -109,16 +128,29 @@ export async function POST(req: Request) {
       });
     } catch (mailError) {
       console.error("Lỗi gửi email cấp tài khoản:", mailError);
+      return NextResponse.json(
+        {
+          message:
+            "Tài khoản Manager đã được tạo nhưng email không gửi được. Hãy kiểm tra cấu hình SMTP và yêu cầu đặt lại mật khẩu sau khi email hoạt động.",
+          managerId: newManager._id,
+          emailSent: false,
+        },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json(
       {
-        message: "Cấp tài khoản Manager thành công và đã gửi mail thông báo!",
+        message: "Tạo tài khoản Manager thành công; máy chủ email đã nhận yêu cầu gửi thư.",
         managerId: newManager._id,
+        emailSent: true,
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { message: "Lỗi Server", error: error instanceof Error ? error.message : "Lỗi không xác định" },
+      { status: 500 }
+    );
   }
 }

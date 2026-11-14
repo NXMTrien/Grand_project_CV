@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface CompanyOption {
   _id: string;
@@ -8,7 +9,9 @@ interface CompanyOption {
 }
 
 export default function ContactPage() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [accessChecked, setAccessChecked] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -19,6 +22,33 @@ export default function ContactPage() {
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
+    void Promise.resolve().then(() => {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const parsedUser: unknown = JSON.parse(storedUser);
+          if (
+            parsedUser &&
+            typeof parsedUser === "object" &&
+            "role" in parsedUser &&
+            typeof parsedUser.role === "string" &&
+            parsedUser.role.toLowerCase() === "admin"
+          ) {
+            router.replace("/admin-panel/feedback");
+            return;
+          }
+        } catch (error) {
+          console.error("Không thể đọc thông tin tài khoản:", error);
+        }
+      }
+
+      setAccessChecked(true);
+    });
+  }, [router]);
+
+  useEffect(() => {
+    if (!accessChecked) return;
+
     fetch("/api/companies")
       .then(async (response) => {
         if (!response.ok) throw new Error("Không thể tải danh sách công ty.");
@@ -28,7 +58,7 @@ export default function ContactPage() {
       .catch((error: unknown) => {
         console.error("Không thể tải danh sách công ty:", error);
       });
-  }, []);
+  }, [accessChecked]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,6 +97,14 @@ export default function ContactPage() {
       setSubmitting(false);
     }
   };
+
+  if (!accessChecked) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-12 text-center text-slate-500">
+        Đang kiểm tra tài khoản...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-12">

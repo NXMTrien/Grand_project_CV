@@ -4,11 +4,14 @@ import User from "@/src/models/User";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 
-// Khởi tạo Transporter ép kiểu port chính xác
+export const runtime = "nodejs";
+
+const mailPort = Number(process.env.MAIL_PORT) || 587;
+
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: false, // true cho cổng 465, false cho 587/25
+  port: mailPort,
+  secure: mailPort === 465,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -71,7 +74,7 @@ export async function POST(req: Request) {
             </div>
           `,
         });
-      } catch (mailError: any) {
+      } catch (mailError: unknown) {
         console.error("Lỗi gửi Email:", mailError);
         return NextResponse.json(
           { message: "Không thể gửi email OTP, vui lòng kiểm tra lại cấu hình mail server" },
@@ -139,10 +142,10 @@ export async function POST(req: Request) {
       { message: "Hành động không hợp lệ" },
       { status: 400 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Lỗi Quên Mật Khẩu:", error);
     return NextResponse.json(
-      { message: "Lỗi Server", error: error.message },
+      { message: "Lỗi Server", error: error instanceof Error ? error.message : "Lỗi không xác định" },
       { status: 500 }
     );
   }
