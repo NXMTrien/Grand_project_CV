@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface CategoryOption {
   _id: string;
@@ -25,8 +26,8 @@ export default function CVBuilderPage() {
   const [title, setTitle] = useState("CV Kỹ Sư Phần Mềm");
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [profileError, setProfileError] = useState("");
-  const [categoryError, setCategoryError] = useState("");
+  const [profileError, setProfileError] = useAlertState("", (message) => message);
+  const [categoryError, setCategoryError] = useAlertState("", (message) => message);
 
   // STATE ĐÃ ĐƯỢC NÂNG CẤP ĐẦY ĐỦ CÁC TRƯỜNG THEO YÊU CẦU
   const [cvData, setCvData] = useState({
@@ -105,7 +106,7 @@ export default function CVBuilderPage() {
     }
 
     void loadFormData();
-  }, []);
+  }, [setCategoryError, setProfileError]);
 
   const handleSaveCV = async () => {
     if (!token) {

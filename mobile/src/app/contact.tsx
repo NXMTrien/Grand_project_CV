@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { apiRequest } from "@/src/lib/api";
 import { Button, Card, colors, Field, Heading, Notice, Screen } from "@/src/components/ui";
+import useAlertState from "@/src/hooks/useAlertState";
 
 interface CompanyOption {
   _id: string;
@@ -18,8 +19,8 @@ export default function ContactScreen() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
 
   useEffect(() => {
     let active = true;
@@ -30,7 +31,7 @@ export default function ContactScreen() {
       })
       .finally(() => { if (active) setLoadingCompanies(false); });
     return () => { active = false; };
-  }, []);
+  }, [setError]);
 
   const submit = async () => {
     setError("");

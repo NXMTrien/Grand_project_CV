@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text } from "react-native";
-import { Button, Card, colors, Heading, Loading, Notice, Screen } from "@/src/components/ui";
+import { Button, Card, colors, Heading, Loading, Screen } from "@/src/components/ui";
 import { useAuth } from "@/src/providers/AuthProvider";
 import { apiRequest, type ApiEnvelope, type NotificationItem } from "@/src/lib/api";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function NotificationsScreen() {
   const { token, ready } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [openingId, setOpeningId] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message, false);
 
   const loadNotifications = useCallback(async () => {
     if (!token) {
@@ -27,7 +28,7 @@ export default function NotificationsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [setError, token]);
 
   useEffect(() => {
     if (ready) void Promise.resolve().then(loadNotifications);
@@ -77,8 +78,9 @@ export default function NotificationsScreen() {
   return (
     <Screen>
       <Heading title="Thông báo" subtitle="Cập nhật mới nhất về hồ sơ ứng tuyển của bạn." />
-      {error ? <Notice message={error} /> : null}
-      {notifications.length === 0 && !error ? (
+      {error ? (
+        <Card><Button title="Tải lại thông báo" onPress={() => void loadNotifications()} secondary /></Card>
+      ) : notifications.length === 0 ? (
         <Card><Text style={styles.empty}>Bạn chưa có thông báo mới.</Text></Card>
       ) : (
         notifications.map((item) => (

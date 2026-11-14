@@ -13,6 +13,7 @@ const FeedbackSchema = new Schema(
       enum: ["NEW", "REVIEWING", "RESOLVED"],
       default: "NEW",
     },
+    resolvedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

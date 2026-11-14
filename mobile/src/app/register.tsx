@@ -3,14 +3,15 @@ import { Link, router } from "expo-router";
 import { StyleSheet, Text } from "react-native";
 import { apiRequest } from "@/src/lib/api";
 import { Button, colors, Field, Heading, Notice, Screen } from "@/src/components/ui";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
@@ -33,7 +34,7 @@ export default function RegisterScreen() {
     try {
       const result = await apiRequest<{ message?: string }>("/api/auth/register", {
         method: "POST",
-        body: { fullName: fullName.trim(), email: email.trim().toLowerCase(), password, dateOfBirth, role: "CANDIDATE" },
+        body: { fullName: fullName.trim(), email: email.trim().toLowerCase(), password, dateOfBirth },
       });
       setSuccess(result.message || "Đăng ký thành công. Hãy đăng nhập.");
       setTimeout(() => router.replace("/login"), 900);

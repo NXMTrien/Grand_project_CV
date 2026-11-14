@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import useAlertState from "@/src/lib/useAlertState";
 import {
   User as UserIcon,
   Mail,
@@ -68,16 +69,16 @@ export default function ProfilePage() {
   const [showConfirmPwd, setShowConfirmPwd] = useState<boolean>(false);
 
   // Thông báo chung
-  const [statusMsg, setStatusMsg] = useState<{
+  const [statusMsg, setStatusMsg] = useAlertState<{
     type: "success" | "error" | null;
     text: string;
-  }>({ type: null, text: "" });
+  }>({ type: null, text: "" }, (message) => message.text || null);
 
   // Thông báo riêng cho Đổi mật khẩu
-  const [pwdMsg, setPwdMsg] = useState<{
+  const [pwdMsg, setPwdMsg] = useAlertState<{
     type: "success" | "error" | null;
     text: string;
-  }>({ type: null, text: "" });
+  }>({ type: null, text: "" }, (message) => message.text || null);
 
   // 1. Tải thông tin cá nhân
   const fetchProfile = useCallback(async () => {
@@ -145,7 +146,7 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setStatusMsg]);
 
   useEffect(() => {
     fetchProfile();
@@ -290,6 +291,21 @@ export default function ProfilePage() {
         type: "success",
         text: result.message || "Đổi mật khẩu thành công!",
       });
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const parsedUser: unknown = JSON.parse(storedUser);
+          if (parsedUser && typeof parsedUser === "object") {
+            localStorage.setItem(
+              "user",
+              JSON.stringify({ ...parsedUser, mustChangePassword: false, isFirstLogin: false })
+            );
+            window.dispatchEvent(new Event("auth-change"));
+          }
+        } catch (error) {
+          console.error("Không thể cập nhật trạng thái tài khoản:", error);
+        }
+      }
 
       // Reset form sau khi đổi thành công
       setPwdData({

@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation"; // 👈 Thêm router
 import { isSalaryRange, matchesSalaryRange, SALARY_RANGES, type SalaryRange } from "@/src/lib/jobSearch";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface CategoryOption {
   _id: string;
@@ -70,7 +71,7 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
   const [page, setPage] = useState(initialPage);
   const [myResumes, setMyResumes] = useState<ResumeItem[]>([]);
   const [isApplying, setIsApplying] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useAlertState("", (message) => message);
 
   // STATE QUẢN LÝ MODAL & FORM ỨNG TUYỂN
   const [applyJob, setApplyJob] = useState<JobItem | null>(null);

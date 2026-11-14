@@ -3,12 +3,13 @@ import { Link, router } from "expo-router";
 import { StyleSheet, Text } from "react-native";
 import { Button, colors, Field, Heading, Notice, Screen } from "@/src/components/ui";
 import { useAuth } from "@/src/providers/AuthProvider";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {

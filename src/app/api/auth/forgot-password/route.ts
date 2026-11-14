@@ -126,6 +126,8 @@ export async function POST(req: Request) {
       // Hash mật khẩu mới
       const hashedNewPassword = await bcrypt.hash(newPassword, 10);
       user.password = hashedNewPassword;
+      user.isFirstLogin = false;
+      user.mustChangePassword = false;
 
       // Xóa thông tin OTP
       user.otpCode = undefined;
@@ -133,7 +135,7 @@ export async function POST(req: Request) {
       await user.save();
 
       return NextResponse.json(
-        { message: "Đặt lại mật khẩu thành công!" },
+        { message: "Đặt lại mật khẩu thành công!", data: { email: cleanEmail } },
         { status: 200 }
       );
     }

@@ -188,6 +188,7 @@ export async function PATCH(request: Request) {
     if (user.isFirstLogin !== undefined) {
       user.isFirstLogin = false;
     }
+    user.mustChangePassword = false;
 
     await user.save();
 

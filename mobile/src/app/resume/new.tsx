@@ -4,6 +4,7 @@ import { Text } from "react-native";
 import { apiRequest } from "@/src/lib/api";
 import { Button, Field, Heading, Notice, Screen } from "@/src/components/ui";
 import { useAuth } from "@/src/providers/AuthProvider";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function CreateResumeScreen() {
   const { token, user } = useAuth();
@@ -23,7 +24,7 @@ export default function CreateResumeScreen() {
   const [experienceCompany, setExperienceCompany] = useState("");
   const [experiencePosition, setExperiencePosition] = useState("");
   const [experienceDetails, setExperienceDetails] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
 
   const save = async () => {

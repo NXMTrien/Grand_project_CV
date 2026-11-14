@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface CompanyItem {
   _id: string;
@@ -37,7 +38,7 @@ export default function CreateCompanyPage() {
   const [myCompanies, setMyCompanies] = useState<CompanyItem[]>([]);
   const [fetchingCompanies, setFetchingCompanies] = useState(true);
   const [companyJobs, setCompanyJobs] = useState<Record<string, CompanyJob[]>>({});
-  const [companyJobsError, setCompanyJobsError] = useState("");
+  const [companyJobsError, setCompanyJobsError] = useAlertState("", (message) => message);
 
   // State Form Tạo công ty mới
   const [formData, setFormData] = useState({
@@ -63,11 +64,11 @@ export default function CreateCompanyPage() {
   const [editImagesList, setEditImagesList] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [modalError, setModalError] = useState("");
+  const [modalError, setModalError] = useAlertState("", (message) => message);
 
   // UI General States
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -118,7 +119,7 @@ export default function CreateCompanyPage() {
     } finally {
       setFetchingCompanies(false);
     }
-  }, []);
+  }, [setCompanyJobsError]);
 
   const handleHiringStatusChange = async (jobId: string, hiringStatus: "OPEN" | "CLOSED") => {
     const token = localStorage.getItem("token");

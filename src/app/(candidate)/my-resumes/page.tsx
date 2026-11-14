@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface Resume {
   _id: string;
@@ -13,7 +14,7 @@ interface Resume {
 export default function MyResumesPage() {
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message, false);
 
   useEffect(() => {
     fetchResumes();
@@ -60,7 +61,13 @@ export default function MyResumesPage() {
       {loading ? (
         <p>Đang tải danh sách CV...</p>
       ) : error ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-700">{error}</div>
+        <button
+          type="button"
+          onClick={() => void fetchResumes()}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          Tải lại danh sách CV
+        </button>
       ) : resumes.length === 0 ? (
         <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-6 text-yellow-700">
           Bạn chưa có CV nào. Hãy tạo CV mới để ứng tuyển ngay.

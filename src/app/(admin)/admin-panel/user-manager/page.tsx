@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import useAlertState from "@/src/lib/useAlertState";
 import {
   Search,
   RefreshCw,
@@ -55,7 +56,7 @@ export default function UserManagerPage() {
     blockedCount: 0,
   });
   const [loading, setLoading] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useAlertState<string | null>(null, (message) => message);
 
   // Trạng thái xử lý Block/Unblock
   const [actionLoading, setActionLoading] = useState<boolean>(false);
@@ -136,7 +137,7 @@ export default function UserManagerPage() {
     } finally {
       setLoading(false);
     }
-  }, [getAuthToken]);
+  }, [getAuthToken, setErrorMsg]);
 
   useEffect(() => {
     fetchUsers();

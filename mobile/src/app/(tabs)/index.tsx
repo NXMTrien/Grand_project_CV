@@ -19,7 +19,8 @@ import {
   type Category,
   type Job,
 } from "@/src/lib/api";
-import { Button, Card, colors, Heading, Loading, Notice, Screen } from "@/src/components/ui";
+import { Button, Card, colors, Heading, Loading, Screen } from "@/src/components/ui";
+import useAlertState from "@/src/hooks/useAlertState";
 
 const salaryFilters = [
   { label: "Mọi mức lương", min: 0, max: Number.POSITIVE_INFINITY },
@@ -50,7 +51,7 @@ export default function JobsScreen() {
   const [salaryFilter, setSalaryFilter] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message, false);
 
   const loadData = useCallback(async () => {
     setError("");
@@ -67,7 +68,7 @@ export default function JobsScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     void Promise.resolve().then(loadData);
@@ -231,7 +232,6 @@ export default function JobsScreen() {
         <Loading label="Đang tải việc làm..." />
       ) : error ? (
         <Card>
-          <Notice message={error} />
           <Button title="Thử lại" onPress={() => void loadData()} />
         </Card>
       ) : filteredJobs.length === 0 ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface JobItem {
   _id: string;
@@ -21,7 +22,7 @@ interface JobItem {
 export default function AdminPendingJobsPage() {
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Tải danh sách công việc chưa duyệt khi vào trang

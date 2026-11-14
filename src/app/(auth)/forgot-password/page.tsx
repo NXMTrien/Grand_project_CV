@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import useAlertState from "@/src/lib/useAlertState";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -8,8 +9,8 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAlertState("", (value) => value);
+  const [error, setError] = useAlertState("", (value) => value);
   const [loading, setLoading] = useState(false);
 
   // Gửi yêu cầu mã OTP về Mail
@@ -28,8 +29,8 @@ export default function ForgotPasswordPage() {
 
       setMessage(data.message);
       setStep(2); // Chuyển sang giao diện nhập mã OTP
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể gửi mã OTP.");
     } finally {
       setLoading(false);
     }
@@ -49,10 +50,32 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const user: unknown = JSON.parse(storedUser);
+          if (
+            user &&
+            typeof user === "object" &&
+            "email" in user &&
+            typeof user.email === "string" &&
+            user.email.toLowerCase() === String(data.data?.email || email).toLowerCase()
+          ) {
+            localStorage.setItem(
+              "user",
+              JSON.stringify({ ...user, mustChangePassword: false, isFirstLogin: false })
+            );
+            window.dispatchEvent(new Event("auth-change"));
+          }
+        } catch (storageError) {
+          console.error("Không thể cập nhật trạng thái tài khoản:", storageError);
+        }
+      }
+
       alert("Đặt lại mật khẩu thành công! Hãy đăng nhập lại.");
       router.push("/login");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể đặt lại mật khẩu.");
     } finally {
       setLoading(false);
     }

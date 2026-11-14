@@ -4,6 +4,8 @@ import User from "@/src/models/User";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
+import { parseAdultDateOfBirth } from "@/src/lib/age";
+import { randomBytes } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -81,6 +83,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Thiếu thông tin bắt buộc" }, { status: 400 });
     }
 
+    const birthDate = parseAdultDateOfBirth(dateOfBirth);
+    if (!birthDate) {
+      return NextResponse.json({ message: "Manager phải từ 18 tuổi trở lên" }, { status: 400 });
+    }
+
     // 4. KIỂM TRA TÀI KHOẢN TỒN TẠI CHƯA
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -88,7 +95,7 @@ export async function POST(req: Request) {
     }
 
     // 5. TẠO MẬT KHẨU NGẪU NHIÊN VÀ HASH
-    const randomPassword = Math.random().toString(36).slice(-8) + "A1!";
+    const randomPassword = `${randomBytes(12).toString("hex")}A1!`;
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
     // 6. LƯU VÀO DATABASE VỚI QUYỀN MANAGER
@@ -96,10 +103,11 @@ export async function POST(req: Request) {
       email,
       password: hashedPassword,
       fullName,
-      dateOfBirth: new Date(dateOfBirth),
+      dateOfBirth: birthDate,
       role: "MANAGER",
       companyId: companyId || null,
       isVerified: true,
+      mustChangePassword: true,
     });
 
     // 7. GỬI EMAIL THÔNG BÁO CẤP TÀI KHOẢN
@@ -115,7 +123,7 @@ export async function POST(req: Request) {
             <p>Quản trị viên hệ thống GrandJob đã cấp tài khoản truy cập dành cho Nhà tuyển dụng/Quản lý cho bạn.</p>
             
             <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
-              <p style="margin: 5px 0;"><strong>Trang đăng nhập:</strong> <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login">Click vào đây để đến trang đăng nhập</a></p>
+              <p style="margin: 5px 0;"><strong>Trang đăng nhập:</strong> <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4010'}/login">Click vào đây để đến trang đăng nhập</a></p>
               <p style="margin: 5px 0;"><strong>Tài khoản (Email):</strong> ${email}</p>
               <p style="margin: 5px 0;"><strong>Mật khẩu tạm thời:</strong> <span style="color: #ef4444; font-weight: bold;">${randomPassword}</span></p>
             </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface Company {
   _id: string;
@@ -40,8 +41,8 @@ export default function CreateJobPage() {
 
   // UI States
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // 1. Kiểm tra Token từ localStorage và Tải danh sách Công ty + Danh mục

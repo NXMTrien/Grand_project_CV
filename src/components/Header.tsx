@@ -17,6 +17,7 @@ interface HeaderUser {
   fullName?: string;
   name?: string;
   role?: string;
+  mustChangePassword?: boolean;
   avatar?: string;
   email?: string;
 }
@@ -150,6 +151,17 @@ export default function Header() {
   const isLoggedIn = Boolean(token && user);
   const roleDisplay = getRoleDisplayName(rawRole);
   const isManagerOrHR = rawRole === "hr" || rawRole === "company" || rawRole === "manager";
+
+  useEffect(() => {
+    if (
+      token &&
+      rawRole === "manager" &&
+      user?.mustChangePassword &&
+      window.location.pathname !== "/change-password"
+    ) {
+      window.location.replace("/change-password");
+    }
+  }, [rawRole, token, user]);
 
   return (
     <header

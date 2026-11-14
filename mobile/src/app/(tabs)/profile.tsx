@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { Button, Card, colors, Field, Heading, Loading, Notice, Screen } from "@/src/components/ui";
 import { useAuth } from "@/src/providers/AuthProvider";
 import { apiRequest, type ApiEnvelope, type UserProfile } from "@/src/lib/api";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function ProfileScreen() {
   const { token, user, ready, signOut, setUser } = useAuth();
@@ -16,8 +17,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
 
   const loadProfile = useCallback(async () => {
     if (!token) {
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [setError, token]);
 
   useEffect(() => {
     if (ready) void Promise.resolve().then(loadProfile);

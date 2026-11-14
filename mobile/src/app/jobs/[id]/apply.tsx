@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { Button, Card, colors, Field, Heading, Loading, Notice, Screen } from "@/src/components/ui";
 import { useAuth } from "@/src/providers/AuthProvider";
 import { apiRequest, type ApiEnvelope, type Resume } from "@/src/lib/api";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function ApplyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -13,8 +14,8 @@ export default function ApplyScreen() {
   const [coverLetter, setCoverLetter] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
 
   const loadResumes = useCallback(async () => {
     if (!token) {
@@ -33,7 +34,7 @@ export default function ApplyScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [setError, token]);
 
   useEffect(() => {
     void Promise.resolve().then(loadResumes);

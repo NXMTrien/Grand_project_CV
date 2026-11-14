@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface ResumeData {
   _id: string;
@@ -41,7 +42,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function EmployerApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState("");
   const [companyName, setCompanyName] = useState("");

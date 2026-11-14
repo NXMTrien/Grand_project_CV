@@ -2,14 +2,15 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { Button, Field, Heading, Notice, Screen } from "@/src/components/ui";
 import { apiRequest } from "@/src/lib/api";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [requested, setRequested] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
+  const [success, setSuccess] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
 
   const requestOtp = async () => {

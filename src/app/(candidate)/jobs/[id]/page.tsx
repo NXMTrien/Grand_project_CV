@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface JobDetail {
   _id: string;
@@ -30,7 +31,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
 
   // STATE QUẢN LÝ ỨNG TUYỂN
   const [myResumes, setMyResumes] = useState<ResumeItem[]>([]);
@@ -61,7 +62,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+  }, [jobId, setError]);
 
   const fetchResumes = useCallback(async () => {
     try {

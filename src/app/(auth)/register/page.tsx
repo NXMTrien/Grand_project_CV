@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { latestAdultDateOfBirth } from "@/src/lib/age";
+import useAlertState from "@/src/lib/useAlertState";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,9 +16,8 @@ export default function RegisterPage() {
     password: "",
     fullName: "",
     dateOfBirth: "",
-    role: "CANDIDATE", // Luôn cố định là CANDIDATE cho người dùng
   });
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -38,8 +39,8 @@ export default function RegisterPage() {
 
       alert("Đăng ký thành công! Hãy đăng nhập.");
       router.push("/login");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Đăng ký thất bại");
     } finally {
       setLoading(false);
     }
@@ -123,6 +124,7 @@ export default function RegisterPage() {
             <input 
               type="date" 
               required 
+              max={latestAdultDateOfBirth()}
               style={inputStyle("dateOfBirth")}
               onFocus={() => setFocusedField("dateOfBirth")}
               onBlur={() => setFocusedField(null)}

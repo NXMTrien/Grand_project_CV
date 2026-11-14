@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Text } from "react-native";
-import { Button, Field, Heading, Loading, Notice, Screen } from "@/src/components/ui";
+import { Button, Field, Heading, Loading, Screen } from "@/src/components/ui";
 import { useAuth } from "@/src/providers/AuthProvider";
 import { apiRequest, type ApiEnvelope, type Resume } from "@/src/lib/api";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function EditResumeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +27,7 @@ export default function EditResumeScreen() {
   const [experienceDetails, setExperienceDetails] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useAlertState("", (message) => message);
 
   const loadResume = useCallback(async () => {
     if (!token) {
@@ -58,7 +59,7 @@ export default function EditResumeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token, id]);
+  }, [id, setError, token]);
 
   useEffect(() => {
     void Promise.resolve().then(loadResume);
@@ -105,13 +106,12 @@ export default function EditResumeScreen() {
   if (loading) return <Loading label="Đang tải CV..." />;
   if (!token) return <Screen><Heading title="Đăng nhập để sửa CV" /><Button title="Đăng nhập" onPress={() => router.push("/login")} /></Screen>;
   if (!resume) {
-    return <Screen><Notice message={error || "Không tìm thấy CV."} /><Button title="Quay lại CV của tôi" onPress={() => router.replace("/(tabs)/resumes")} secondary /></Screen>;
+    return <Screen><Button title="Quay lại CV của tôi" onPress={() => router.replace("/(tabs)/resumes")} secondary /></Screen>;
   }
 
   return (
     <Screen>
       <Heading title="Cập nhật CV" subtitle="Các thay đổi sẽ được lưu vào CV hiện tại." />
-      {error ? <Notice message={error} /> : null}
       <Field label="Tên CV" value={resume.title} editable={false} />
       <Field label="Họ và tên" value={fullName} onChangeText={setFullName} />
       <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />

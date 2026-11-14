@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface CategoryItem {
   _id: string;
@@ -16,7 +17,9 @@ export default function AdminCategoryPage() {
   const [skillsInput, setSkillsInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useAlertState<
+    { type: "success" | "error"; text: string } | null
+  >(null, (value) => value?.text || null);
 
   // Lấy danh sách danh mục hiện có
   const fetchCategories = async () => {

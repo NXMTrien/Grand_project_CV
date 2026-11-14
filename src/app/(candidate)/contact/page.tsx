@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import useAlertState from "@/src/lib/useAlertState";
 
 interface CompanyOption {
   _id: string;
   name: string;
 }
 
+const managerRequestMessage =
+  "Xin chào Admin, tôi muốn xin tài khoản để đăng thông tin tuyển dụng lên Trang của bạn. Mong được bạn chấp thuận";
+
 export default function ContactPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [accessChecked, setAccessChecked] = useState(false);
+  const [activeTab, setActiveTab] = useState<"feedback" | "manager">("feedback");
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -19,7 +24,17 @@ export default function ContactPage() {
   const [content, setContent] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useAlertState<
+    { type: "success" | "error"; text: string } | null
+  >(null, (message) => message?.text || null);
+  const [managerName, setManagerName] = useState("");
+  const [managerEmail, setManagerEmail] = useState("");
+  const [managerBirthYear, setManagerBirthYear] = useState("");
+  const [managerSubmitting, setManagerSubmitting] = useState(false);
+  const [managerMessage, setManagerMessage] = useAlertState<
+    { type: "success" | "error"; text: string } | null
+  >(null, (message) => message?.text || null);
+  const latestEligibleBirthYear = new Date().getUTCFullYear() - 18;
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -98,6 +113,40 @@ export default function ContactPage() {
     }
   };
 
+  const handleManagerRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setManagerSubmitting(true);
+    setManagerMessage(null);
+
+    try {
+      const response = await fetch("/api/manager-account-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: managerName,
+          email: managerEmail,
+          birthYear: Number(managerBirthYear),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Không thể gửi yêu cầu xin tài khoản.");
+      }
+
+      setManagerMessage({ type: "success", text: result.message });
+      setManagerName("");
+      setManagerEmail("");
+      setManagerBirthYear("");
+    } catch (error) {
+      setManagerMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể gửi yêu cầu xin tài khoản.",
+      });
+    } finally {
+      setManagerSubmitting(false);
+    }
+  };
+
   if (!accessChecked) {
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-12 text-center text-slate-500">
@@ -113,10 +162,36 @@ export default function ContactPage() {
           <p className="mb-2 text-sm font-bold uppercase tracking-widest text-emerald-600">GrandJob</p>
           <h1 className="text-3xl font-extrabold text-slate-900">Liên hệ & phản ánh</h1>
           <p className="mx-auto mt-3 max-w-xl text-slate-600">
-            Gửi phản ánh về công ty để Ban quản trị kiểm tra. Bạn có thể gửi ẩn danh nếu không muốn cung cấp thông tin liên hệ.
+            Gửi phản ánh về công ty hoặc xin tài khoản Manager để đăng thông tin tuyển dụng.
           </p>
         </div>
 
+        <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Các mục liên hệ">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "feedback"}
+            onClick={() => setActiveTab("feedback")}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${
+              activeTab === "feedback" ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white text-slate-700"
+            }`}
+          >
+            Gửi phản ánh
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "manager"}
+            onClick={() => setActiveTab("manager")}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${
+              activeTab === "manager" ? "bg-emerald-600 text-white" : "border border-slate-300 bg-white text-slate-700"
+            }`}
+          >
+            Xin tài khoản Manager
+          </button>
+        </div>
+
+        {activeTab === "feedback" ? (
         <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           {feedbackMessage && (
             <div
@@ -231,6 +306,88 @@ export default function ContactPage() {
             {submitting ? "Đang gửi..." : "Gửi phản ánh"}
           </button>
         </form>
+        ) : (
+          <form onSubmit={handleManagerRequest} className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            {managerMessage && (
+              <div
+                role="status"
+                className={`rounded-lg border p-4 text-sm ${
+                  managerMessage.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-rose-200 bg-rose-50 text-rose-800"
+                }`}
+              >
+                {managerMessage.text}
+              </div>
+            )}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="managerName" className="mb-2 block text-sm font-semibold text-slate-700">
+                  Họ và tên
+                </label>
+                <input
+                  id="managerName"
+                  value={managerName}
+                  onChange={(event) => setManagerName(event.target.value)}
+                  maxLength={120}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="managerEmail" className="mb-2 block text-sm font-semibold text-slate-700">
+                  Email
+                </label>
+                <input
+                  id="managerEmail"
+                  type="email"
+                  value={managerEmail}
+                  onChange={(event) => setManagerEmail(event.target.value)}
+                  maxLength={254}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="managerBirthYear" className="mb-2 block text-sm font-semibold text-slate-700">
+                  Năm sinh
+                </label>
+                <input
+                  id="managerBirthYear"
+                  type="number"
+                  min={1900}
+                  max={latestEligibleBirthYear}
+                  value={managerBirthYear}
+                  onChange={(event) => setManagerBirthYear(event.target.value)}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-emerald-500"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Chỉ gửi yêu cầu nếu bạn đã đủ 18 tuổi; Admin sẽ xác minh độ tuổi trước khi cấp tài khoản.
+                </p>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="managerRequestMessage" className="mb-2 block text-sm font-semibold text-slate-700">
+                Lời nhắn gửi Admin
+              </label>
+              <textarea
+                id="managerRequestMessage"
+                value={managerRequestMessage}
+                readOnly
+                rows={3}
+                className="w-full resize-none rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-slate-700"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={managerSubmitting}
+              className="w-full rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              {managerSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

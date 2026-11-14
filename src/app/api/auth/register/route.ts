@@ -2,26 +2,20 @@ import { NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
 import User from "@/src/models/User";
 import bcrypt from "bcrypt";
+import { parseAdultDateOfBirth } from "@/src/lib/age";
 
 export async function POST(req: Request) {
   try {
     await connectDB();
-    const { email, password, fullName, dateOfBirth, role } = await req.json();
+    const { email, password, fullName, dateOfBirth } = await req.json();
 
     if (!email || !password || !fullName || !dateOfBirth) {
       return NextResponse.json({ message: "Thiếu thông tin bắt buộc" }, { status: 400 });
     }
 
-    // Kiểm tra điều kiện tuổi >= 18
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    if (age < 18) {
-      return NextResponse.json({ message: "Người dùng phải từ 18 tuổi trở lên" }, { status: 400 });
+    const birthDate = parseAdultDateOfBirth(dateOfBirth);
+    if (!birthDate) {
+      return NextResponse.json({ message: "Bạn phải từ 18 tuổi trở lên để đăng ký" }, { status: 400 });
     }
 
     // Kiểm tra trùng email
@@ -38,11 +32,14 @@ export async function POST(req: Request) {
       password: hashedPassword,
       fullName,
       dateOfBirth: birthDate,
-      role: role || "CANDIDATE"
+      role: "CANDIDATE"
     });
 
     return NextResponse.json({ message: "Đăng ký thành công!", userId: newUser._id }, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { message: "Lỗi Server", error: error instanceof Error ? error.message : "Lỗi không xác định" },
+      { status: 500 }
+    );
   }
 }

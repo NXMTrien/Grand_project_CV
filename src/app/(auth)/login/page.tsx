@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import useAlertState from "@/src/lib/useAlertState";
 
 export default function LoginPage() {
   const systemNameLeft = "Grand";
@@ -8,7 +9,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
   const [loading, setLoading] = useState(false);
 
   const [isButtonHovered, setIsButtonHovered] = useState(false);
@@ -29,14 +30,16 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      console.log("👉 Response từ API Login:", data);
-
       // Nếu tài khoản bị khóa (status 403) hoặc sai mật khẩu (status 401),
       // data.message từ backend sẽ được ném ra và hiển thị ở khung errorBox
       if (!res.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
       const token = data.token || data.accessToken || data.data?.token;
       const user = data.user || data.data?.user;
+      const requiresPasswordChange =
+        typeof user?.role === "string" &&
+        user.role.toUpperCase() === "MANAGER" &&
+        user.mustChangePassword === true;
 
       if (!token) {
         console.error("❌ Không tìm thấy Token trong response API!", data);
@@ -47,13 +50,18 @@ export default function LoginPage() {
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      alert(`Chào mừng quay trở lại, ${user?.fullName || user?.name || "Bạn"}!`);
+      alert(
+        requiresPasswordChange
+          ? "Đây là lần đăng nhập đầu tiên. Vui lòng đổi mật khẩu để tiếp tục."
+          : `Chào mừng quay trở lại, ${user?.fullName || user?.name || "Bạn"}!`
+      );
 
       // Chuyển hướng trang
-      window.location.href = "/";
-    } catch (err: any) {
-      console.error("❌ Lỗi Đăng Nhập:", err.message);
-      setError(err.message);
+      window.location.href = requiresPasswordChange ? "/change-password" : "/";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Đăng nhập thất bại.";
+      console.error("Lỗi đăng nhập:", message);
+      setError(message);
     } finally {
       setLoading(false);
     }

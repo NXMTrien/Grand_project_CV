@@ -59,14 +59,17 @@ export async function POST(req: Request) {
         user: {
           userId: user._id,
           fullName: user.fullName,
+          email: user.email,
           role: user.role,
+          mustChangePassword:
+            user.role === "MANAGER" && user.mustChangePassword === true,
         },
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: "Lỗi Server", error: error.message },
+      { message: "Lỗi Server", error: error instanceof Error ? error.message : "Lỗi không xác định" },
       { status: 500 }
     );
   }

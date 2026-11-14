@@ -1,22 +1,8 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/src/lib/mongodb";
 import Feedback from "@/src/models/Feedback";
-import User from "@/src/models/User";
-import { getAuthPayload } from "@/src/lib/auth";
+import { requireAdmin } from "@/src/lib/admin-auth";
 import mongoose from "mongoose";
-
-async function requireAdmin(request: Request) {
-  const auth = getAuthPayload(request.headers);
-  if (!auth?.userId) {
-    return { error: "Vui lòng đăng nhập tài khoản Admin.", status: 401 as const };
-  }
-
-  const admin = await User.findById(auth.userId).select("role isBlocked");
-  if (!admin || admin.role !== "ADMIN" || admin.isBlocked) {
-    return { error: "Bạn không có quyền truy cập chức năng này.", status: 403 as const };
-  }
-  return { admin };
-}
 
 export async function POST(request: Request) {
   try {
@@ -103,11 +89,25 @@ export async function GET(request: Request) {
   try {
     await connectDB();
     const auth = await requireAdmin(request);
-    if (auth.error) {
+    if ("error" in auth) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
-    const feedback = await Feedback.find({}).sort({ createdAt: -1 }).lean();
+    const retentionCutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    await Feedback.deleteMany({
+      status: "RESOLVED",
+      $or: [
+        { resolvedAt: { $lte: retentionCutoff } },
+        { resolvedAt: null, updatedAt: { $lte: retentionCutoff } },
+      ],
+    });
+    const feedback = await Feedback.find({
+      $or: [
+        { status: { $ne: "RESOLVED" } },
+        { resolvedAt: { $gt: retentionCutoff } },
+        { resolvedAt: null, updatedAt: { $gt: retentionCutoff } },
+      ],
+    }).sort({ createdAt: -1 }).lean();
     return NextResponse.json({ success: true, data: feedback });
   } catch (error) {
     console.error("Không thể tải danh sách phản ánh:", error);
@@ -122,7 +122,7 @@ export async function PATCH(request: Request) {
   try {
     await connectDB();
     const auth = await requireAdmin(request);
-    if (auth.error) {
+    if ("error" in auth) {
       return NextResponse.json({ success: false, message: auth.error }, { status: auth.status });
     }
 
@@ -147,17 +147,23 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const feedback = await Feedback.findByIdAndUpdate(
-      feedbackId,
-      { status },
-      { new: true, runValidators: true }
-    );
+    const feedback = await Feedback.findById(feedbackId);
     if (!feedback) {
       return NextResponse.json(
         { success: false, message: "Không tìm thấy phản ánh." },
         { status: 404 }
       );
     }
+    const nextStatus = status as "NEW" | "REVIEWING" | "RESOLVED";
+    if (nextStatus === "RESOLVED") {
+      if (feedback.status !== "RESOLVED" || !feedback.resolvedAt) {
+        feedback.resolvedAt = new Date();
+      }
+    } else {
+      feedback.resolvedAt = null;
+    }
+    feedback.status = nextStatus;
+    await feedback.save();
     return NextResponse.json({ success: true, data: feedback });
   } catch (error) {
     console.error("Không thể cập nhật phản ánh:", error);

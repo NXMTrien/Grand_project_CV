@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { latestAdultDateOfBirth } from "@/src/lib/age";
+import useAlertState from "@/src/lib/useAlertState";
 
 export default function CreateManagerPage() {
-  const router = useRouter();
-
   // State quản lý Form
   const [formData, setFormData] = useState({
     fullName: "",
@@ -16,7 +15,9 @@ export default function CreateManagerPage() {
 
   // State trạng thái UI
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useAlertState<
+    { type: "success" | "error"; text: string } | null
+  >(null, (value) => value?.text || null);
 
   // Xử lý thay đổi input
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,10 +82,10 @@ export default function CreateManagerPage() {
         dateOfBirth: "",
         companyId: "",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessage({
         type: "error",
-        text: err.message || "Không thể kết nối đến máy chủ!",
+        text: err instanceof Error ? err.message : "Không thể kết nối đến máy chủ!",
       });
     } finally {
       setLoading(false);
@@ -179,12 +180,13 @@ export default function CreateManagerPage() {
           {/* Ngày sinh */}
           <div>
             <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-              Ngày sinh <span style={{ color: "#ef4444" }}>*</span>
+              Ngày sinh (từ 18 tuổi trở lên) <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
               type="date"
               name="dateOfBirth"
               required
+              max={latestAdultDateOfBirth()}
               value={formData.dateOfBirth}
               onChange={handleChange}
               style={{

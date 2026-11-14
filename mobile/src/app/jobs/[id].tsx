@@ -2,21 +2,27 @@ import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/src/providers/AuthProvider";
-import { Button, Card, colors, Heading, Loading, Notice, Screen } from "@/src/components/ui";
+import { Button, Card, colors, Heading, Loading, Screen } from "@/src/components/ui";
 import { apiRequest, categoryName, companyName, formatSalary, type ApiEnvelope, type Job } from "@/src/lib/api";
+import useAlertState from "@/src/hooks/useAlertState";
 
 export default function JobDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useAlertState("", (message) => message);
 
   useEffect(() => {
     let active = true;
     void apiRequest<ApiEnvelope<Job>>(`/api/jobs/${encodeURIComponent(id)}`)
       .then((result) => {
-        if (active) setJob(result.data ?? null);
+        if (!active) return;
+        if (!result.data) {
+          setError("Không tìm thấy việc làm.");
+          return;
+        }
+        setJob(result.data);
       })
       .catch((loadError: unknown) => {
         if (active) setError(loadError instanceof Error ? loadError.message : "Không thể tải việc làm.");
@@ -25,13 +31,12 @@ export default function JobDetailsScreen() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [id]);
+  }, [id, setError]);
 
   if (loading) return <Loading label="Đang tải chi tiết việc làm..." />;
   if (error || !job) {
     return (
       <Screen>
-        <Notice message={error || "Không tìm thấy việc làm."} />
         <Button title="Quay lại danh sách" onPress={() => router.replace("/(tabs)")} secondary />
       </Screen>
     );
