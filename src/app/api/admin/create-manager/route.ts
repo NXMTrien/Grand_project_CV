@@ -5,10 +5,14 @@ import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 
+export const runtime = "nodejs";
+
+const mailPort = Number(process.env.MAIL_PORT) || 587;
+
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
-  port: parseInt(process.env.MAIL_PORT || "587"),
-  secure: false,
+  port: mailPort,
+  secure: mailPort === 465,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -109,12 +113,22 @@ export async function POST(req: Request) {
       });
     } catch (mailError) {
       console.error("Lỗi gửi email cấp tài khoản:", mailError);
+      return NextResponse.json(
+        {
+          message:
+            "Tài khoản Manager đã được tạo nhưng email không gửi được. Hãy kiểm tra cấu hình SMTP và yêu cầu đặt lại mật khẩu sau khi email hoạt động.",
+          managerId: newManager._id,
+          emailSent: false,
+        },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json(
       {
-        message: "Cấp tài khoản Manager thành công và đã gửi mail thông báo!",
+        message: "Tạo tài khoản Manager thành công; máy chủ email đã nhận yêu cầu gửi thư.",
         managerId: newManager._id,
+        emailSent: true,
       },
       { status: 201 }
     );

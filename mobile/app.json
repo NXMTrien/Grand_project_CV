@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "GrandJob",
+    "slug": "grandjob-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "grandjob",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
@@ -33,10 +33,16 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "db1bcf08-0af0-4264-9a70-46eafef0a4a3"
+      }
     }
   }
 }

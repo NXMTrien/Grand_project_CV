@@ -1,24 +1,23 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+GrandJob's Web application is a Next.js project at the repository root. The Expo Mobile app lives in [`mobile/`](./mobile/README.md) with its own dependencies; it is separate from the Web build and deployment.
 
-## Getting Started
+## Run the applications
 
-First, run the development server:
+Run the Web development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:4010](http://localhost:4010) to use the Web application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+When the separate Mobile project is available locally, use `npm start` to start it or `npm run dev:all` to start Web and Mobile together. Running `npm run` without a script name only lists available scripts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+To run the production Web server locally, use:
+
+```bash
+npm run build
+npm run start:web
+```
 
 ## Learn More
 
@@ -29,8 +28,8 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deploy the Web application
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Vercel is the simplest option** for deploying the Web application: connect the repository, keep the project root at the repository root, and configure `MONGODB_URI`, `JWT_SECRET`, `MAIL_HOST`, `MAIL_PORT`, `EMAIL_USER`, and `EMAIL_PASS` as production environment variables. Set `NEXT_PUBLIC_APP_URL` to the public Web origin if password recovery links should point to it. Next.js's Node.js deployment supports the server-rendered pages and API routes used by this project; do not use static export for this app.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Render or Railway can also run the root app as a Node.js service using `npm run build` and `npm run start:web`. Deploying Web does not require installing or building the separate Mobile app.

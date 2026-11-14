@@ -4,11 +4,15 @@ import User from "@/src/models/User";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 
+export const runtime = "nodejs";
+
+const mailPort = Number(process.env.MAIL_PORT) || 587;
+
 // Khởi tạo Transporter ép kiểu port chính xác
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST,
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: false, // true cho cổng 465, false cho 587/25
+  port: mailPort,
+  secure: mailPort === 465,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,

@@ -211,13 +211,13 @@ export default function Header() {
             Trang chủ
           </Link>
           <Link
-            href="/contact"
+            href={rawRole === "admin" ? "/admin-panel/feedback" : "/contact"}
             id="contact"
             onMouseEnter={() => setHoveredLink("contact")}
             onMouseLeave={() => setHoveredLink(null)}
             style={navLinkStyle("contact")}
           >
-            Liên hệ
+            {rawRole === "admin" ? "Phản ánh" : "Liên hệ"}
           </Link>
 
           {/* 👑 ROLE: ADMIN */}
