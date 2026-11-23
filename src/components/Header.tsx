@@ -547,7 +547,7 @@ export default function Header() {
                         <span style={{ display: "block", color: "#0f172a", fontSize: "13px", fontWeight: 700 }}>
                           {item.title}
                         </span>
-                        <span style={{ display: "block", marginTop: "4px", color: "#475569", fontSize: "12px", lineHeight: 1.5 }}>
+                        <span style={{ display: "block", marginTop: "4px", color: "#475569", fontSize: "12px", lineHeight: 1.5, whiteSpace: "pre-line" }}>
                           {item.message}
                         </span>
                       </Link>

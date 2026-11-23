@@ -59,11 +59,20 @@ export async function POST(req: Request) {
     }
 
     // 3. ĐỌC DỮ LIỆU TỪ BODY
-    const { email, fullName, dateOfBirth, companyId } = await req.json();
+    const { email, fullName, birthYear, companyId } = await req.json();
 
     // Kiểm tra thông tin bắt buộc
-    if (!email || !fullName || !dateOfBirth) {
+    if (!email || !fullName) {
       return NextResponse.json({ message: "Thiếu thông tin bắt buộc" }, { status: 400 });
+    }
+
+    if (!/^\d{4}$/.test(String(birthYear ?? ""))) {
+      return NextResponse.json({ message: "Năm sinh phải gồm đúng 4 chữ số" }, { status: 400 });
+    }
+
+    const parsedBirthYear = Number(birthYear);
+    if (parsedBirthYear < 1900 || parsedBirthYear > new Date().getFullYear()) {
+      return NextResponse.json({ message: "Năm sinh không hợp lệ" }, { status: 400 });
     }
 
     // 4. KIỂM TRA TÀI KHOẢN TỒN TẠI CHƯA
@@ -81,7 +90,7 @@ export async function POST(req: Request) {
       email,
       password: hashedPassword,
       fullName,
-      dateOfBirth: new Date(dateOfBirth),
+      birthYear: parsedBirthYear,
       role: "MANAGER",
       companyId: companyId || null,
       isVerified: true,

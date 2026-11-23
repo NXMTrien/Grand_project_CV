@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useAlert } from "@/src/components/AlertProvider";
 
 export default function LoginPage() {
+  const { showAlert } = useAlert();
   const systemNameLeft = "Grand";
   const systemNameRight = "Job";
 
@@ -47,7 +49,7 @@ export default function LoginPage() {
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      alert(`Chào mừng quay trở lại, ${user?.fullName || user?.name || "Bạn"}!`);
+      await showAlert(`Chào mừng quay trở lại, ${user?.fullName || user?.name || "Bạn"}!`);
 
       // Chuyển hướng trang
       window.location.href = "/";

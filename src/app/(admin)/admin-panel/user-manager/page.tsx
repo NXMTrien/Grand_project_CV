@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
+import { useAlert } from "@/src/components/AlertProvider";
 
 interface UserItem {
   _id: string;
@@ -32,6 +33,7 @@ interface UserItem {
   isBlocked: boolean;
   isVerified: boolean;
   dateOfBirth?: string;
+  birthYear?: number;
   createdAt: string;
 }
 
@@ -45,6 +47,7 @@ interface StatsData {
 }
 
 export default function UserManagerPage() {
+  const { showAlert, showConfirm } = useAlert();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [stats, setStats] = useState<StatsData>({
     total: 0,
@@ -148,7 +151,7 @@ export default function UserManagerPage() {
     const action = isCurrentlyBlocked ? "UNBLOCK" : "BLOCK";
     const actionText = isCurrentlyBlocked ? "mở khóa" : "khóa";
 
-    if (!confirm(`Bạn có chắc chắn muốn ${actionText} tài khoản của "${user.fullName}" không?`)) {
+    if (!(await showConfirm(`Bạn có chắc chắn muốn ${actionText} tài khoản của "${user.fullName}" không?`))) {
       return;
     }
 
@@ -199,7 +202,7 @@ export default function UserManagerPage() {
         blockedCount: nextIsBlocked ? prev.blockedCount + 1 : prev.blockedCount - 1,
       }));
     } catch (err: any) {
-      alert(err.message || "Đã có lỗi xảy ra khi thực hiện thao tác.");
+      await showAlert(err.message || "Đã có lỗi xảy ra khi thực hiện thao tác.");
     } finally {
       setActionLoading(false);
     }
@@ -698,13 +701,14 @@ export default function UserManagerPage() {
                   <div className="flex items-center gap-1.5 text-slate-400 mb-1">
                     <Calendar className="w-3.5 h-3.5" />
                     <span className="text-xs font-bold uppercase tracking-wider">
-                      Ngày sinh
+                      Năm sinh / Ngày sinh
                     </span>
                   </div>
                   <span className="text-slate-800 font-semibold text-xs block">
-                    {selectedUser.dateOfBirth
-                      ? new Date(selectedUser.dateOfBirth).toLocaleDateString("vi-VN")
-                      : "Chưa cập nhật"}
+                    {selectedUser.birthYear ??
+                      (selectedUser.dateOfBirth
+                        ? new Date(selectedUser.dateOfBirth).toLocaleDateString("vi-VN")
+                        : "Chưa cập nhật")}
                   </span>
                 </div>
 

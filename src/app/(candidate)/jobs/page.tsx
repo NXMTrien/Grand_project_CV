@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation"; // 👈 Thêm router
+import { useAlert } from "@/src/components/AlertProvider";
 import { isSalaryRange, matchesSalaryRange, SALARY_RANGES, type SalaryRange } from "@/src/lib/jobSearch";
 
 interface CategoryOption {
@@ -52,6 +53,7 @@ function formatSalary(salaryMin?: number, salaryMax?: number) {
 
 export default function JobsPage({ searchParams }: JobsPageProps) {
   const router = useRouter(); // 👈 Khởi tạo router
+  const { showAlert } = useAlert();
   const initialSearchParams = use(searchParams);
   const initialSearch = typeof initialSearchParams.search === "string" ? initialSearchParams.search : "";
   const initialCategory = typeof initialSearchParams.category === "string" ? initialSearchParams.category : "";
@@ -130,10 +132,10 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
     );
   }, []);
 
-  const handleOpenApplyModal = (job: JobItem) => {
+  const handleOpenApplyModal = async (job: JobItem) => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Vui lòng đăng nhập trước khi ứng tuyển!");
+      await showAlert("Vui lòng đăng nhập trước khi ứng tuyển!");
       return;
     }
 
@@ -146,7 +148,7 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
 
     if (!applyJob) return;
     if (!selectedResumeId) {
-      alert("Vui lòng chọn 1 chiếc CV phù hợp!");
+      await showAlert("Vui lòng chọn 1 chiếc CV phù hợp!");
       return;
     }
 
@@ -172,11 +174,11 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Ứng tuyển thất bại");
 
-      alert(data.message || "Ứng tuyển thành công!");
+      await showAlert(data.message || "Ứng tuyển thành công!");
       setApplyJob(null);
       setSelfIntroduction("");
     } catch (err) {
-      alert(getErrorMessage(err, "Có lỗi xảy ra khi ứng tuyển"));
+      await showAlert(getErrorMessage(err, "Có lỗi xảy ra khi ứng tuyển"));
     } finally {
       setIsApplying(false);
     }
@@ -189,10 +191,9 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
   const filteredJobs = jobs.filter((job) => {
     const normalizedSearch = search.trim().toLowerCase();
     const title = job.title?.toLowerCase() || "";
-    const company = job.companyId?.name?.toLowerCase() || "";
     const jobCategoryId = typeof job.categoryId === "string" ? job.categoryId : job.categoryId?._id;
     return (
-      (!normalizedSearch || title.includes(normalizedSearch) || company.includes(normalizedSearch)) &&
+      (!normalizedSearch || title.includes(normalizedSearch)) &&
       (!selectedCategory || jobCategoryId === selectedCategory) &&
       matchesSalaryRange(job.salaryMin, job.salaryMax, selectedSalary) &&
       (!selectedLocation || job.location?.toLowerCase() === selectedLocation.toLowerCase())
@@ -270,7 +271,7 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
         >
           <input
             type="text"
-            placeholder="Tìm kiếm vị trí công việc, tên công ty..."
+            placeholder="Tìm kiếm theo tiêu đề bài đăng..."
             style={{
               flex: "1 1 300px",
               padding: "10px 16px",
@@ -286,7 +287,7 @@ export default function JobsPage({ searchParams }: JobsPageProps) {
               setSearch(e.target.value);
               setPage(1);
             }}
-            aria-label="Từ khóa hoặc tên công ty"
+            aria-label="Tiêu đề bài đăng"
           />
           <select
             aria-label="Vị trí"

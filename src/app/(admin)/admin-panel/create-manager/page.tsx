@@ -1,28 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAlert } from "@/src/components/AlertProvider";
 
 export default function CreateManagerPage() {
-  const router = useRouter();
+  const { showAlert } = useAlert();
 
   // State quản lý Form
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
-    dateOfBirth: "",
+    birthYear: "",
     companyId: "",
   });
 
   // State trạng thái UI
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Xử lý thay đổi input
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value =
+      e.target.name === "birthYear"
+        ? e.target.value.replace(/\D/g, "").slice(0, 4)
+        : e.target.value;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]: value,
     });
   };
 
@@ -30,30 +33,23 @@ export default function CreateManagerPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage(null);
 
-    // 1. LẤY TOKEN TỪ LOCALSTORAGE
     const token = localStorage.getItem("token");
 
     if (!token) {
-      setMessage({
-        type: "error",
-        text: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!",
-      });
+      await showAlert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!");
       setLoading(false);
       return;
     }
 
     try {
-      // Chuẩn hóa dữ liệu: Làm sạch khoảng trắng và chuyển companyId trống thành null
       const payload = {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
-        dateOfBirth: formData.dateOfBirth,
+        birthYear: formData.birthYear,
         companyId: formData.companyId.trim() ? formData.companyId.trim() : null,
       };
 
-      // 2. GỬI YÊU CẦU API VỚI HEADER AUTHORIZATION
       const response = await fetch("/api/admin/create-manager", {
         method: "POST",
         headers: {
@@ -69,23 +65,18 @@ export default function CreateManagerPage() {
         throw new Error(data.message || "Có lỗi xảy ra khi tạo tài khoản!");
       }
 
-      // Thông báo thành công và reset form
-      setMessage({
-        type: "success",
-        text: data.message || "Tạo tài khoản Manager và gửi email thành công!",
-      });
+      await showAlert(data.message || "Tạo tài khoản Manager và gửi email thành công!");
 
       setFormData({
         fullName: "",
         email: "",
-        dateOfBirth: "",
+        birthYear: "",
         companyId: "",
       });
-    } catch (err: any) {
-      setMessage({
-        type: "error",
-        text: err.message || "Không thể kết nối đến máy chủ!",
-      });
+    } catch (err: unknown) {
+      await showAlert(
+        err instanceof Error ? err.message : "Không thể kết nối đến máy chủ!"
+      );
     } finally {
       setLoading(false);
     }
@@ -108,24 +99,6 @@ export default function CreateManagerPage() {
         <p style={{ fontSize: "14px", color: "#64748b", marginBottom: "24px" }}>
           Hệ thống sẽ tự động tạo mật khẩu ngẫu nhiên và gửi thông tin đăng nhập đến email của Quản lý.
         </p>
-
-        {/* Thông báo Thành công / Thất bại */}
-        {message && (
-          <div
-            style={{
-              padding: "12px 16px",
-              borderRadius: "8px",
-              marginBottom: "20px",
-              fontSize: "14px",
-              fontWeight: "500",
-              backgroundColor: message.type === "success" ? "#dcfce7" : "#fee2e2",
-              color: message.type === "success" ? "#15803d" : "#b91c1c",
-              border: `1px solid ${message.type === "success" ? "#bbf7d0" : "#fecaca"}`,
-            }}
-          >
-            {message.text}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
           {/* Họ và tên */}
@@ -176,16 +149,21 @@ export default function CreateManagerPage() {
             />
           </div>
 
-          {/* Ngày sinh */}
+          {/* Năm sinh */}
           <div>
             <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-              Ngày sinh <span style={{ color: "#ef4444" }}>*</span>
+              Năm sinh <span style={{ color: "#ef4444" }}>*</span>
             </label>
             <input
-              type="date"
-              name="dateOfBirth"
+              type="text"
+              name="birthYear"
               required
-              value={formData.dateOfBirth}
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              title="Vui lòng nhập năm sinh gồm 4 chữ số"
+              placeholder="Ví dụ: 1995"
+              value={formData.birthYear}
               onChange={handleChange}
               style={{
                 width: "100%",
