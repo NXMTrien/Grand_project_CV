@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface ResumeData {
   _id: string;
@@ -27,12 +27,18 @@ interface ApplicationItem {
   coverLetter?: string;
   status: ApplicationStatus;
   createdAt: string;
-  jobId?: { _id: string; title: string; location?: string };
+  jobId?: {
+    _id: string;
+    title: string;
+    location?: string;
+    companyId?: { name?: string; address?: string };
+    managerId?: { fullName?: string };
+  };
   userId?: { _id: string; fullName: string; email: string; phone?: string };
   resumeId?: ResumeData;
 }
 
-type ApplicationStatus = "SENT" | "REVIEWING" | "INTERVIEW" | "REJECTED";
+type ApplicationStatus = "SENT" | "REVIEWING" | "INTERVIEW" | "APPROVED" | "REJECTED";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -45,11 +51,14 @@ export default function EmployerApplicationsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [approvalApp, setApprovalApp] = useState<ApplicationItem | null>(null);
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
 
   // State cho Modal xem thông tin CV Online & Cover Letter
   const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null);
 
-  const fetchApplications = async (selectedCompanyId = "") => {
+  const fetchApplications = useCallback(async (selectedCompanyId = "", selectedApplicationId = "") => {
     setLoading(true);
     setError("");
     try {
@@ -64,13 +73,17 @@ export default function EmployerApplicationsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Không thể tải danh sách ứng viên");
 
-      setApplications(data.data || []);
+      const items = data.data || [];
+      setApplications(items);
+      if (selectedApplicationId) {
+        setSelectedApp(items.find((item: ApplicationItem) => item._id === selectedApplicationId) || null);
+      }
     } catch (err) {
       setError(getErrorMessage(err, "Lỗi kết nối"));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -78,12 +91,14 @@ export default function EmployerApplicationsPage() {
       const selectedCompanyId = params.get("companyId") || "";
       setCompanyName(params.get("companyName") || "");
       setCompanyId(selectedCompanyId);
-      return fetchApplications(selectedCompanyId);
+      return fetchApplications(selectedCompanyId, params.get("applicationId") || "");
     });
-  }, []);
+  }, [fetchApplications]);
 
-  const handleStatusChange = async (applicationId: string, newStatus: ApplicationStatus) => {
+  const updateApplicationStatus = async (applicationId: string, newStatus: ApplicationStatus, inviteDate?: string) => {
     setUpdatingId(applicationId);
+    setError("");
+    setStatusMessage("");
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/employer/applications", {
@@ -92,7 +107,7 @@ export default function EmployerApplicationsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ applicationId, status: newStatus }),
+        body: JSON.stringify({ applicationId, status: newStatus, appointmentDate: inviteDate }),
       });
 
       const data = await res.json();
@@ -103,12 +118,51 @@ export default function EmployerApplicationsPage() {
           item._id === applicationId ? { ...item, status: newStatus } : item
         )
       );
+      if (newStatus === "REVIEWING") {
+        setStatusMessage("Đã chuyển sang đang xét tuyển và gửi thông báo cho ứng viên.");
+      } else if (newStatus === "APPROVED") {
+        setStatusMessage("Đã chấp thuận hồ sơ và gửi thư mời qua thông báo và email.");
+        setApprovalApp(null);
+        setAppointmentDate("");
+      }
     } catch (err) {
-      alert(getErrorMessage(err, "Lỗi khi đổi trạng thái"));
+      setError(getErrorMessage(err, "Lỗi khi đổi trạng thái"));
     } finally {
       setUpdatingId(null);
     }
   };
+
+  const handleStatusChange = (applicationId: string, newStatus: ApplicationStatus) => {
+    if (newStatus === "APPROVED") {
+      const application = applications.find((item) => item._id === applicationId);
+      if (application) {
+        setAppointmentDate("");
+        setApprovalApp(application);
+      }
+      return;
+    }
+    void updateApplicationStatus(applicationId, newStatus);
+  };
+
+  const handleSendInvitation = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!approvalApp || !appointmentDate) return;
+    void updateApplicationStatus(approvalApp._id, "APPROVED", appointmentDate);
+  };
+
+  const today = new Date();
+  const minAppointmentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const appointmentWeekday = appointmentDate
+    ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "long" })
+    : "";
+  const formattedAppointmentDate = appointmentDate
+    ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("vi-VN", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "";
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -117,6 +171,7 @@ export default function EmployerApplicationsPage() {
       case "REVIEWING":
         return "bg-amber-100 text-amber-800 border-amber-200";
       case "INTERVIEW":
+      case "APPROVED":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "REJECTED":
         return "bg-rose-100 text-rose-800 border-rose-200";
@@ -145,6 +200,11 @@ export default function EmployerApplicationsPage() {
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
+          </div>
+        )}
+        {statusMessage && (
+          <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            {statusMessage}
           </div>
         )}
 
@@ -233,8 +293,9 @@ export default function EmployerApplicationsPage() {
                             className="text-xs border rounded-lg p-1.5 outline-none bg-white shadow-sm font-medium focus:ring-2 focus:ring-emerald-500"
                           >
                             <option value="SENT">SENT (Mới nộp)</option>
-                            <option value="REVIEWING">REVIEWING (Đang duyệt)</option>
+                            <option value="REVIEWING">REVIEWING (Đang xét tuyển)</option>
                             <option value="INTERVIEW">INTERVIEW (Mời phỏng vấn)</option>
+                            <option value="APPROVED">APPROVED (Đã chấp thuận)</option>
                             <option value="REJECTED">REJECTED (Từ chối)</option>
                           </select>
                         </td>
@@ -253,7 +314,7 @@ export default function EmployerApplicationsPage() {
             <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 shadow-xl">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="text-xl font-bold text-gray-800">
-                  CV Online: {selectedApp.resumeId?.title}
+                  Hồ sơ ứng viên: {selectedApp.userId?.fullName || "Chưa rõ"}
                 </h3>
                 <button
                   onClick={() => setSelectedApp(null)}
@@ -268,6 +329,17 @@ export default function EmployerApplicationsPage() {
                   <h4 className="font-bold text-amber-800 text-sm mb-1">Thư xin việc (Cover Letter):</h4>
                   <p className="text-sm text-amber-900 whitespace-pre-line">{selectedApp.coverLetter}</p>
                 </div>
+              )}
+
+              {selectedApp.resumeId?.type === "ATTACHMENT" && selectedApp.resumeId.fileUrl && (
+                <a
+                  href={selectedApp.resumeId.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Mở CV đính kèm: {selectedApp.resumeId.title}
+                </a>
               )}
 
               {selectedApp.resumeId?.cvData ? (
@@ -328,6 +400,70 @@ export default function EmployerApplicationsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {approvalApp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <form onSubmit={handleSendInvitation} className="max-h-[90vh] w-full max-w-xl space-y-5 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+              <div className="flex items-start justify-between gap-4 border-b pb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Thư mời ứng viên đến trao đổi</h2>
+                  <p className="mt-1 text-sm text-slate-500">Thông tin công ty và nhà tuyển dụng được điền sẵn.</p>
+                </div>
+                <button type="button" onClick={() => setApprovalApp(null)} className="text-xl font-bold text-slate-400 hover:text-slate-700" aria-label="Đóng">
+                  ×
+                </button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Tên công ty
+                  <input readOnly value={approvalApp.jobId?.companyId?.name || ""} className="mt-1.5 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-slate-600" />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Người tuyển dụng
+                  <input readOnly value={approvalApp.jobId?.managerId?.fullName || ""} className="mt-1.5 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-slate-600" />
+                </label>
+                <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+                  Địa chỉ công ty
+                  <input readOnly value={approvalApp.jobId?.companyId?.address || approvalApp.jobId?.location || ""} className="mt-1.5 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-slate-600" />
+                </label>
+              </div>
+
+              <div>
+                <label htmlFor="appointmentDate" className="block text-sm font-semibold text-slate-700">
+                  Chọn ngày hẹn (ngày / tháng / năm)
+                </label>
+                <input
+                  id="appointmentDate"
+                  type="date"
+                  required
+                  min={minAppointmentDate}
+                  value={appointmentDate}
+                  onChange={(event) => setAppointmentDate(event.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+                {appointmentWeekday && (
+                  <p className="mt-2 text-sm font-medium capitalize text-emerald-700">
+                    Thứ được chọn: {appointmentWeekday} ({formattedAppointmentDate})
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+                Xin mời bạn đến công ty để thuận tiện trao đổi.
+              </div>
+
+              <div className="flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row">
+                <button type="button" onClick={() => setApprovalApp(null)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                  Hủy
+                </button>
+                <button type="submit" disabled={!appointmentDate || updatingId === approvalApp._id} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  {updatingId === approvalApp._id ? "Đang gửi..." : "Chấp thuận và gửi lời mời"}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>

@@ -114,18 +114,6 @@ export default function TopCVHomePage() {
     router.push(query ? `/jobs?${query}` : "/jobs");
   };
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-    const params = new URLSearchParams();
-    if (categoryId) params.set("category", categoryId);
-    if (searchTitle.trim()) params.set("search", searchTitle.trim());
-    if (selectedSalary) params.set("salary", selectedSalary);
-    if (selectedLocation) params.set("location", selectedLocation);
-
-    const query = params.toString();
-    router.push(query ? `/jobs?${query}` : "/jobs");
-  };
-
   return (
     <div style={{ backgroundColor: "#f4f6f9", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", color: "#334155" }}>
       
@@ -238,7 +226,7 @@ export default function TopCVHomePage() {
             <select
               aria-label="Chọn danh mục ngành nghề"
               value={selectedCategory}
-              onChange={(e) => handleCategorySelect(e.target.value)}
+              onChange={(e) => setSelectedCategory(e.target.value)}
               style={{
                 width: "100%",
                 padding: "12px 16px",
@@ -266,7 +254,7 @@ export default function TopCVHomePage() {
 
             {selectedCategory && (
               <button type="button"
-                onClick={() => handleCategorySelect("")}
+                onClick={() => setSelectedCategory("")}
                 style={{
                   backgroundColor: "#f1f5f9",
                   color: "#64748b",

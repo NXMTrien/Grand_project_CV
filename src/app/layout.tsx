@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "@/src/app/globals.css";
 import Header from "@/src/components/Header";
 import Footer from "@/src/components/Footer";
+import AlertProvider from "@/src/components/AlertProvider";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -19,10 +20,12 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${inter.className} bg-gray-50 text-gray-900 min-h-screen flex flex-col`}>
-        <Header />
-        {/* Thẻ main flex-grow đẩy footer xuống đáy nếu nội dung trang quá ngắn */}
-        <main className="flex-grow">{children}</main>
-        <Footer />
+        <AlertProvider>
+          <Header />
+          {/* Thẻ main flex-grow đẩy footer xuống đáy nếu nội dung trang quá ngắn */}
+          <main className="flex-grow">{children}</main>
+          <Footer />
+        </AlertProvider>
       </body>
     </html>
   );

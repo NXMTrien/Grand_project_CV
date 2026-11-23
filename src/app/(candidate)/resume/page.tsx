@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAlert } from "@/src/components/AlertProvider";
 
 interface CategoryOption {
   _id: string;
@@ -21,6 +22,7 @@ interface UserProfileResponse {
 }
 
 export default function CVBuilderPage() {
+  const { showAlert } = useAlert();
   const [token, setToken] = useState("");
   const [title, setTitle] = useState("CV Kỹ Sư Phần Mềm");
   const [loading, setLoading] = useState(false);
@@ -109,11 +111,11 @@ export default function CVBuilderPage() {
 
   const handleSaveCV = async () => {
     if (!token) {
-      alert("Vui lòng đăng nhập tài khoản Ứng viên trước khi lưu CV!");
+      await showAlert("Vui lòng đăng nhập tài khoản Ứng viên trước khi lưu CV!");
       return;
     }
     if (!cvData.targetPosition) {
-      alert("Vui lòng chọn ngành nghề muốn ứng tuyển!");
+      await showAlert("Vui lòng chọn ngành nghề muốn ứng tuyển!");
       return;
     }
     setLoading(true);
@@ -128,9 +130,9 @@ export default function CVBuilderPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Không thể lưu CV");
-      alert("🎉 " + (data.message || "Lưu CV thành công!"));
+      await showAlert("🎉 " + (data.message || "Lưu CV thành công!"));
     } catch (err) {
-      alert("Lỗi: " + (err instanceof Error ? err.message : "Không thể lưu CV."));
+      await showAlert("Lỗi: " + (err instanceof Error ? err.message : "Không thể lưu CV."));
     } finally {
       setLoading(false);
     }

@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAlert } from "@/src/components/AlertProvider";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { showAlert } = useAlert();
   
   // Đồng bộ tên hệ thống
   const systemNameLeft = "Grand";
@@ -36,7 +38,7 @@ export default function RegisterPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Đăng ký thất bại");
 
-      alert("Đăng ký thành công! Hãy đăng nhập.");
+      await showAlert("Đăng ký thành công! Hãy đăng nhập.");
       router.push("/login");
     } catch (err: any) {
       setError(err.message);

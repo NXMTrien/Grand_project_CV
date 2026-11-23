@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 4010",
+    "dev:all": "concurrently --kill-others --names WEB,MOBILE \"npm run dev\" \"npm run start:mobile\"",
     "build": "next build",
-    "start": "next start -p 4010",
+    "start": "npm run start:mobile",
+    "start:web": "next start -p 4010",
+    "start:mobile": "npm --prefix mobile start",
     "lint": "eslint",
     "seed:demo": "node scripts/seed-demo-data.mjs",
     "seed:manager-jobs": "node scripts/seed-manager-companies-jobs.mjs"
@@ -31,6 +34,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
