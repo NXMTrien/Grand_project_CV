@@ -1,11 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { latestAdultDateOfBirth } from "@/src/lib/age";
-import useAlertState from "@/src/lib/useAlertState";
+import { useAlert } from "@/src/components/AlertProvider";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { showAlert } = useAlert();
   
   // Đồng bộ tên hệ thống
   const systemNameLeft = "Grand";
@@ -16,8 +16,9 @@ export default function RegisterPage() {
     password: "",
     fullName: "",
     dateOfBirth: "",
+    role: "CANDIDATE", // Luôn cố định là CANDIDATE cho người dùng
   });
-  const [error, setError] = useAlertState("", (message) => message);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -37,10 +38,10 @@ export default function RegisterPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Đăng ký thất bại");
 
-      alert("Đăng ký thành công! Hãy đăng nhập.");
+      await showAlert("Đăng ký thành công! Hãy đăng nhập.");
       router.push("/login");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Đăng ký thất bại");
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -124,7 +125,6 @@ export default function RegisterPage() {
             <input 
               type="date" 
               required 
-              max={latestAdultDateOfBirth()}
               style={inputStyle("dateOfBirth")}
               onFocus={() => setFocusedField("dateOfBirth")}
               onBlur={() => setFocusedField(null)}

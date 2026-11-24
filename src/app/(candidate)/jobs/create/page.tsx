@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import useAlertState from "@/src/lib/useAlertState";
+import { useAlert } from "@/src/components/AlertProvider";
 
 interface Company {
   _id: string;
@@ -16,6 +16,7 @@ interface Category {
 
 export default function CreateJobPage() {
   const router = useRouter();
+  const { showAlert } = useAlert();
 
   // State lưu danh sách chọn
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -41,8 +42,8 @@ export default function CreateJobPage() {
 
   // UI States
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useAlertState("", (message) => message);
-  const [success, setSuccess] = useAlertState("", (message) => message);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // 1. Kiểm tra Token từ localStorage và Tải danh sách Công ty + Danh mục
@@ -90,23 +91,25 @@ export default function CreateJobPage() {
     const userStr = localStorage.getItem("user");
 
     if (!token || !userStr) {
-      alert("Vui lòng đăng nhập trước khi thực hiện thao tác này!");
-      router.push("/login");
+      void showAlert("Vui lòng đăng nhập trước khi thực hiện thao tác này!").then(
+        () => router.push("/login")
+      );
       return;
     }
 
     try {
       const user = JSON.parse(userStr);
       if (user.role !== "MANAGER") {
-        alert("Quyền truy cập bị từ chối! Chỉ Nhà tuyển dụng (MANAGER) mới được đăng tin.");
-        router.push("/");
+        void showAlert(
+          "Quyền truy cập bị từ chối! Chỉ Nhà tuyển dụng (MANAGER) mới được đăng tin."
+        ).then(() => router.push("/"));
         return;
       }
       fetchInitialData(token);
     } catch {
       router.push("/login");
     }
-  }, [router, fetchInitialData]);
+  }, [router, fetchInitialData, showAlert]);
 
   // Handle Input Changes
   const handleChange = (

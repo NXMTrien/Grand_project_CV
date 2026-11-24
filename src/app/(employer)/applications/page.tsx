@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import useAlertState from "@/src/lib/useAlertState";
+import { useCallback, useEffect, useState } from "react";
 
 interface ResumeData {
   _id: string;
@@ -28,7 +27,13 @@ interface ApplicationItem {
   coverLetter?: string;
   status: ApplicationStatus;
   createdAt: string;
-  jobId?: { _id: string; title: string; location?: string };
+  jobId?: {
+    _id: string;
+    title: string;
+    location?: string;
+    companyId?: { name?: string; address?: string };
+    managerId?: { fullName?: string };
+  };
   userId?: { _id: string; fullName: string; email: string; phone?: string };
   resumeId?: ResumeData;
 }
@@ -42,15 +47,18 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function EmployerApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useAlertState("", (message) => message);
+  const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [approvalApp, setApprovalApp] = useState<ApplicationItem | null>(null);
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
 
   // State cho Modal xem thông tin CV Online & Cover Letter
   const [selectedApp, setSelectedApp] = useState<ApplicationItem | null>(null);
 
-  const fetchApplications = async (selectedCompanyId = "", selectedApplicationId = "") => {
+  const fetchApplications = useCallback(async (selectedCompanyId = "", selectedApplicationId = "") => {
     setLoading(true);
     setError("");
     try {
@@ -75,7 +83,7 @@ export default function EmployerApplicationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -85,10 +93,12 @@ export default function EmployerApplicationsPage() {
       setCompanyId(selectedCompanyId);
       return fetchApplications(selectedCompanyId, params.get("applicationId") || "");
     });
-  }, []);
+  }, [fetchApplications]);
 
-  const handleStatusChange = async (applicationId: string, newStatus: ApplicationStatus) => {
+  const updateApplicationStatus = async (applicationId: string, newStatus: ApplicationStatus, inviteDate?: string) => {
     setUpdatingId(applicationId);
+    setError("");
+    setStatusMessage("");
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("/api/employer/applications", {
@@ -97,7 +107,7 @@ export default function EmployerApplicationsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ applicationId, status: newStatus }),
+        body: JSON.stringify({ applicationId, status: newStatus, appointmentDate: inviteDate }),
       });
 
       const data = await res.json();
@@ -108,12 +118,51 @@ export default function EmployerApplicationsPage() {
           item._id === applicationId ? { ...item, status: newStatus } : item
         )
       );
+      if (newStatus === "REVIEWING") {
+        setStatusMessage("Đã chuyển sang đang xét tuyển và gửi thông báo cho ứng viên.");
+      } else if (newStatus === "APPROVED") {
+        setStatusMessage("Đã chấp thuận hồ sơ và gửi thư mời qua thông báo và email.");
+        setApprovalApp(null);
+        setAppointmentDate("");
+      }
     } catch (err) {
-      alert(getErrorMessage(err, "Lỗi khi đổi trạng thái"));
+      setError(getErrorMessage(err, "Lỗi khi đổi trạng thái"));
     } finally {
       setUpdatingId(null);
     }
   };
+
+  const handleStatusChange = (applicationId: string, newStatus: ApplicationStatus) => {
+    if (newStatus === "APPROVED") {
+      const application = applications.find((item) => item._id === applicationId);
+      if (application) {
+        setAppointmentDate("");
+        setApprovalApp(application);
+      }
+      return;
+    }
+    void updateApplicationStatus(applicationId, newStatus);
+  };
+
+  const handleSendInvitation = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!approvalApp || !appointmentDate) return;
+    void updateApplicationStatus(approvalApp._id, "APPROVED", appointmentDate);
+  };
+
+  const today = new Date();
+  const minAppointmentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const appointmentWeekday = appointmentDate
+    ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "long" })
+    : "";
+  const formattedAppointmentDate = appointmentDate
+    ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("vi-VN", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "";
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -153,6 +202,11 @@ export default function EmployerApplicationsPage() {
             {error}
           </div>
         )}
+        {statusMessage && (
+          <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            {statusMessage}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-20 text-gray-400 font-medium">Đang tải hồ sơ...</div>
@@ -177,6 +231,7 @@ export default function EmployerApplicationsPage() {
                 <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
                   {applications.map((item) => {
                     const resume = item.resumeId;
+                    const isFinalStatus = item.status === "APPROVED" || item.status === "REJECTED";
                     return (
                       <tr key={item._id} className="hover:bg-gray-50 transition">
                         <td className="p-4">
@@ -234,16 +289,20 @@ export default function EmployerApplicationsPage() {
                         <td className="p-4 text-right">
                           <select
                             value={item.status}
-                            disabled={updatingId === item._id}
+                            disabled={updatingId === item._id || isFinalStatus}
                             onChange={(e) => handleStatusChange(item._id, e.target.value as ApplicationStatus)}
-                            className="text-xs border rounded-lg p-1.5 outline-none bg-white shadow-sm font-medium focus:ring-2 focus:ring-emerald-500"
+                            title={isFinalStatus ? "Hồ sơ đã chốt trạng thái và không thể chỉnh sửa." : undefined}
+                            className="text-xs border rounded-lg p-1.5 outline-none bg-white shadow-sm font-medium focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                           >
                             <option value="SENT">SENT (Mới nộp)</option>
-                            <option value="REVIEWING">REVIEWING (Đang duyệt)</option>
+                            <option value="REVIEWING">REVIEWING (Đang xét tuyển)</option>
                             <option value="INTERVIEW">INTERVIEW (Mời phỏng vấn)</option>
                             <option value="APPROVED">APPROVED (Đã chấp thuận)</option>
                             <option value="REJECTED">REJECTED (Từ chối)</option>
                           </select>
+                          {isFinalStatus && (
+                            <p className="mt-1 text-xs text-gray-500">Đã chốt, không thể chỉnh sửa</p>
+                          )}
                         </td>
                       </tr>
                     );
@@ -346,6 +405,70 @@ export default function EmployerApplicationsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {approvalApp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <form onSubmit={handleSendInvitation} className="max-h-[90vh] w-full max-w-xl space-y-5 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+              <div className="flex items-start justify-between gap-4 border-b pb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Thư mời ứng viên đến trao đổi</h2>
+                  <p className="mt-1 text-sm text-slate-500">Thông tin công ty và nhà tuyển dụng được điền sẵn.</p>
+                </div>
+                <button type="button" onClick={() => setApprovalApp(null)} className="text-xl font-bold text-slate-400 hover:text-slate-700" aria-label="Đóng">
+                  ×
+                </button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Tên công ty
+                  <input readOnly value={approvalApp.jobId?.companyId?.name || ""} className="mt-1.5 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-slate-600" />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Người tuyển dụng
+                  <input readOnly value={approvalApp.jobId?.managerId?.fullName || ""} className="mt-1.5 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-slate-600" />
+                </label>
+                <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+                  Địa chỉ công ty
+                  <input readOnly value={approvalApp.jobId?.companyId?.address || approvalApp.jobId?.location || ""} className="mt-1.5 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-slate-600" />
+                </label>
+              </div>
+
+              <div>
+                <label htmlFor="appointmentDate" className="block text-sm font-semibold text-slate-700">
+                  Chọn ngày hẹn (ngày / tháng / năm)
+                </label>
+                <input
+                  id="appointmentDate"
+                  type="date"
+                  required
+                  min={minAppointmentDate}
+                  value={appointmentDate}
+                  onChange={(event) => setAppointmentDate(event.target.value)}
+                  className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+                {appointmentWeekday && (
+                  <p className="mt-2 text-sm font-medium capitalize text-emerald-700">
+                    Thứ được chọn: {appointmentWeekday} ({formattedAppointmentDate})
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+                Xin mời bạn đến công ty để thuận tiện trao đổi.
+              </div>
+
+              <div className="flex flex-col-reverse justify-end gap-3 border-t pt-4 sm:flex-row">
+                <button type="button" onClick={() => setApprovalApp(null)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                  Hủy
+                </button>
+                <button type="submit" disabled={!appointmentDate || updatingId === approvalApp._id} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  {updatingId === approvalApp._id ? "Đang gửi..." : "Chấp thuận và gửi lời mời"}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>

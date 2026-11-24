@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import useAlertState from "@/src/lib/useAlertState";
+import { useAlert } from "@/src/components/AlertProvider";
 
 interface JobDetail {
   _id: string;
@@ -26,12 +26,13 @@ interface ResumeItem {
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const { showAlert } = useAlert();
   const resolvedParams = use(params); // Unwrap params cho Next.js 15+
   const jobId = resolvedParams.id;
 
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useAlertState("", (message) => message);
+  const [error, setError] = useState("");
 
   // STATE QUẢN LÝ ỨNG TUYỂN
   const [myResumes, setMyResumes] = useState<ResumeItem[]>([]);
@@ -62,7 +63,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     } finally {
       setLoading(false);
     }
-  }, [jobId, setError]);
+  }, [jobId]);
 
   const fetchResumes = useCallback(async () => {
     try {
@@ -91,10 +92,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     void Promise.resolve().then(fetchResumes);
   }, [fetchJobDetail, fetchResumes]);
 
-  const handleOpenApplyModal = () => {
+  const handleOpenApplyModal = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Vui lòng đăng nhập trước khi ứng tuyển!");
+      await showAlert("Vui lòng đăng nhập trước khi ứng tuyển!");
       return;
     }
     setIsApplyModalOpen(true);
@@ -105,7 +106,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
     if (!job) return;
     if (!selectedResumeId) {
-      alert("Vui lòng chọn 1 chiếc CV phù hợp!");
+      await showAlert("Vui lòng chọn 1 chiếc CV phù hợp!");
       return;
     }
 
@@ -131,11 +132,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Ứng tuyển thất bại");
 
-      alert(data.message || "Ứng tuyển thành công!");
+      await showAlert(data.message || "Ứng tuyển thành công!");
       setIsApplyModalOpen(false);
       setSelfIntroduction("");
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Có lỗi xảy ra khi ứng tuyển");
+      await showAlert(error instanceof Error ? error.message : "Có lỗi xảy ra khi ứng tuyển");
     } finally {
       setIsApplying(false);
     }

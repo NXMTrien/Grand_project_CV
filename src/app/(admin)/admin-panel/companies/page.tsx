@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import useAlertState from "@/src/lib/useAlertState";
+import { useAlert } from "@/src/components/AlertProvider";
 
 interface JobItem {
   _id: string;
@@ -20,9 +20,10 @@ interface JobItem {
 }
 
 export default function AdminPendingJobsPage() {
+  const { showAlert, showConfirm } = useAlert();
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useAlertState("", (message) => message);
+  const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Tải danh sách công việc chưa duyệt khi vào trang
@@ -50,7 +51,7 @@ export default function AdminPendingJobsPage() {
   const handleVerifyJob = async (jobId: string, status: "APPROVED" | "REJECTED") => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Bạn chưa đăng nhập hoặc thiếu Token trong localStorage!");
+      await showAlert("Bạn chưa đăng nhập hoặc thiếu Token trong localStorage!");
       return;
     }
 
@@ -59,7 +60,7 @@ export default function AdminPendingJobsPage() {
         ? "Bạn có chắc chắn muốn DUYỆT bài đăng này?"
         : "Bạn có chắc chắn muốn TỪ CHỐI bài đăng này?";
 
-    if (!confirm(confirmMsg)) return;
+    if (!(await showConfirm(confirmMsg))) return;
 
     setActionLoading(jobId);
 
@@ -77,11 +78,11 @@ export default function AdminPendingJobsPage() {
 
       if (!res.ok) throw new Error(data.message || "Cập nhật thất bại");
 
-      alert(data.message);
+      await showAlert(data.message);
       // Loại bỏ bài đăng đã xử lý khỏi danh sách hiển thị
       setJobs((prevJobs) => prevJobs.filter((j) => j._id !== jobId));
     } catch (err: any) {
-      alert(err.message || "Lỗi trong quá trình duyệt tin");
+      await showAlert(err.message || "Lỗi trong quá trình duyệt tin");
     } finally {
       setActionLoading(null);
     }

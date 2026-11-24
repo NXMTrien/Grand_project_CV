@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import useAlertState from "@/src/lib/useAlertState";
+import { useAlert } from "@/src/components/AlertProvider";
 
 interface CompanyItem {
   _id: string;
@@ -33,12 +33,13 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function CreateCompanyPage() {
   const router = useRouter();
+  const { showAlert, showConfirm } = useAlert();
 
   // State quản lý danh sách công ty của tôi
   const [myCompanies, setMyCompanies] = useState<CompanyItem[]>([]);
   const [fetchingCompanies, setFetchingCompanies] = useState(true);
   const [companyJobs, setCompanyJobs] = useState<Record<string, CompanyJob[]>>({});
-  const [companyJobsError, setCompanyJobsError] = useAlertState("", (message) => message);
+  const [companyJobsError, setCompanyJobsError] = useState("");
 
   // State Form Tạo công ty mới
   const [formData, setFormData] = useState({
@@ -64,11 +65,11 @@ export default function CreateCompanyPage() {
   const [editImagesList, setEditImagesList] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [modalError, setModalError] = useAlertState("", (message) => message);
+  const [modalError, setModalError] = useState("");
 
   // UI General States
-  const [error, setError] = useAlertState("", (message) => message);
-  const [success, setSuccess] = useAlertState("", (message) => message);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -119,7 +120,7 @@ export default function CreateCompanyPage() {
     } finally {
       setFetchingCompanies(false);
     }
-  }, [setCompanyJobsError]);
+  }, []);
 
   const handleHiringStatusChange = async (jobId: string, hiringStatus: "OPEN" | "CLOSED") => {
     const token = localStorage.getItem("token");
@@ -162,23 +163,23 @@ export default function CreateCompanyPage() {
     const userStr = localStorage.getItem("user");
 
     if (!token || !userStr) {
-      alert("Vui lòng đăng nhập trước!");
-      router.push("/login");
+      void showAlert("Vui lòng đăng nhập trước!").then(() => router.push("/login"));
       return;
     }
 
     try {
       const user = JSON.parse(userStr);
       if (user.role !== "MANAGER") {
-        alert("Chức năng này chỉ dành cho tài khoản Nhà tuyển dụng (MANAGER)!");
-        router.push("/");
+        void showAlert("Chức năng này chỉ dành cho tài khoản Nhà tuyển dụng (MANAGER)!").then(
+          () => router.push("/")
+        );
         return;
       }
       void Promise.resolve().then(() => fetchMyCompanies(token));
     } catch {
       router.push("/login");
     }
-  }, [router, fetchMyCompanies]);
+  }, [router, fetchMyCompanies, showAlert]);
 
   // Handle Input Text Change
   const handleChange = (
@@ -207,7 +208,7 @@ export default function CreateCompanyPage() {
 
     const remainingSlots = 5 - imagesList.length;
     if (remainingSlots <= 0) {
-      alert("Bạn đã tải lên tối đa 5 hình ảnh!");
+      await showAlert("Bạn đã tải lên tối đa 5 hình ảnh!");
       return;
     }
 
@@ -320,7 +321,7 @@ export default function CreateCompanyPage() {
 
     const remainingSlots = 5 - editImagesList.length;
     if (remainingSlots <= 0) {
-      alert("Bạn đã tải lên tối đa 5 hình ảnh!");
+      await showAlert("Bạn đã tải lên tối đa 5 hình ảnh!");
       return;
     }
 
@@ -383,7 +384,7 @@ export default function CreateCompanyPage() {
   const handleDeleteCompany = async () => {
     if (!editingCompany) return;
 
-    const isConfirmed = confirm(
+    const isConfirmed = await showConfirm(
       `Bạn có chắc chắn muốn xóa công ty "${editingCompany.name}"? Hành động này không thể hoàn tác!`
     );
     if (!isConfirmed) return;

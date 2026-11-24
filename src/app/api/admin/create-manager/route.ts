@@ -4,8 +4,6 @@ import User from "@/src/models/User";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
-import { parseAdultDateOfBirth } from "@/src/lib/age";
-import { randomBytes } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -38,26 +36,11 @@ export async function POST(req: Request) {
     const token = authHeader.split(" ")[1];
 
     // 2. GIẢI MÃ TOKEN VÀ KIỂM TRA QUYỀN ADMIN TRONG DATABASE
-    let decoded: string | jwt.JwtPayload;
+    let decoded: any;
     try {
       const jwtSecret = process.env.JWT_SECRET || "your_fallback_jwt_secret";
       decoded = jwt.verify(token, jwtSecret);
-    } catch {
-      return NextResponse.json(
-        { message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!" },
-        { status: 401 }
-      );
-    }
-
-    const userId =
-      typeof decoded === "string"
-        ? null
-        : typeof decoded.id === "string"
-          ? decoded.id
-          : typeof decoded.userId === "string"
-            ? decoded.userId
-            : null;
-    if (!userId) {
+    } catch (err) {
       return NextResponse.json(
         { message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!" },
         { status: 401 }
@@ -65,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     // Tìm thông tin người dùng gửi yêu cầu
-    const adminUser = await User.findById(userId);
+    const adminUser = await User.findById(decoded.id || decoded.userId);
 
     // Kiểm tra tài khoản có tồn tại và có quyền ADMIN hay không
     if (!adminUser || adminUser.role !== "ADMIN") {
@@ -76,16 +59,20 @@ export async function POST(req: Request) {
     }
 
     // 3. ĐỌC DỮ LIỆU TỪ BODY
-    const { email, fullName, dateOfBirth, companyId } = await req.json();
+    const { email, fullName, birthYear, companyId } = await req.json();
 
     // Kiểm tra thông tin bắt buộc
-    if (!email || !fullName || !dateOfBirth) {
+    if (!email || !fullName) {
       return NextResponse.json({ message: "Thiếu thông tin bắt buộc" }, { status: 400 });
     }
 
-    const birthDate = parseAdultDateOfBirth(dateOfBirth);
-    if (!birthDate) {
-      return NextResponse.json({ message: "Manager phải từ 18 tuổi trở lên" }, { status: 400 });
+    if (!/^\d{4}$/.test(String(birthYear ?? ""))) {
+      return NextResponse.json({ message: "Năm sinh phải gồm đúng 4 chữ số" }, { status: 400 });
+    }
+
+    const parsedBirthYear = Number(birthYear);
+    if (parsedBirthYear < 1900 || parsedBirthYear > new Date().getFullYear()) {
+      return NextResponse.json({ message: "Năm sinh không hợp lệ" }, { status: 400 });
     }
 
     // 4. KIỂM TRA TÀI KHOẢN TỒN TẠI CHƯA
@@ -95,7 +82,7 @@ export async function POST(req: Request) {
     }
 
     // 5. TẠO MẬT KHẨU NGẪU NHIÊN VÀ HASH
-    const randomPassword = `${randomBytes(12).toString("hex")}A1!`;
+    const randomPassword = Math.random().toString(36).slice(-8) + "A1!";
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
     // 6. LƯU VÀO DATABASE VỚI QUYỀN MANAGER
@@ -103,11 +90,10 @@ export async function POST(req: Request) {
       email,
       password: hashedPassword,
       fullName,
-      dateOfBirth: birthDate,
+      birthYear: parsedBirthYear,
       role: "MANAGER",
       companyId: companyId || null,
       isVerified: true,
-      mustChangePassword: true,
     });
 
     // 7. GỬI EMAIL THÔNG BÁO CẤP TÀI KHOẢN
@@ -123,7 +109,7 @@ export async function POST(req: Request) {
             <p>Quản trị viên hệ thống GrandJob đã cấp tài khoản truy cập dành cho Nhà tuyển dụng/Quản lý cho bạn.</p>
             
             <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
-              <p style="margin: 5px 0;"><strong>Trang đăng nhập:</strong> <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4010'}/login">Click vào đây để đến trang đăng nhập</a></p>
+              <p style="margin: 5px 0;"><strong>Trang đăng nhập:</strong> <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login">Click vào đây để đến trang đăng nhập</a></p>
               <p style="margin: 5px 0;"><strong>Tài khoản (Email):</strong> ${email}</p>
               <p style="margin: 5px 0;"><strong>Mật khẩu tạm thời:</strong> <span style="color: #ef4444; font-weight: bold;">${randomPassword}</span></p>
             </div>
@@ -155,10 +141,7 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: unknown) {
-    return NextResponse.json(
-      { message: "Lỗi Server", error: error instanceof Error ? error.message : "Lỗi không xác định" },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    return NextResponse.json({ message: "Lỗi Server", error: error.message }, { status: 500 });
   }
 }

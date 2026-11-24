@@ -6,7 +6,8 @@ const UserSchema = new Schema(
     password: { type: String, required: true },
     fullName: { type: String, required: true },
     phone: { type: String, default: "" },
-    dateOfBirth: { type: Date, required: true },
+    dateOfBirth: { type: Date, required: false },
+    birthYear: { type: Number, min: 1900 },
     role: { 
       type: String, 
       enum: ["ADMIN", "MANAGER", "CANDIDATE"], 

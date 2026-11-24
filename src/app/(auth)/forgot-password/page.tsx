@@ -1,16 +1,17 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import useAlertState from "@/src/lib/useAlertState";
+import { useAlert } from "@/src/components/AlertProvider";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1); // Step 1: Nhập email, Step 2: Nhập OTP & Mật khẩu mới
+  const { showAlert } = useAlert();
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [message, setMessage] = useAlertState("", (value) => value);
-  const [error, setError] = useAlertState("", (value) => value);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Gửi yêu cầu mã OTP về Mail
@@ -36,7 +37,27 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  // Xác thực OTP và đặt mật khẩu mới
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(""); setMessage(""); setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "VERIFY_OTP", email, otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Mã OTP không hợp lệ.");
+      setMessage(data.message);
+      setStep(3);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể xác thực mã OTP.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); setMessage(""); setLoading(true);
@@ -50,29 +71,7 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        try {
-          const user: unknown = JSON.parse(storedUser);
-          if (
-            user &&
-            typeof user === "object" &&
-            "email" in user &&
-            typeof user.email === "string" &&
-            user.email.toLowerCase() === String(data.data?.email || email).toLowerCase()
-          ) {
-            localStorage.setItem(
-              "user",
-              JSON.stringify({ ...user, mustChangePassword: false, isFirstLogin: false })
-            );
-            window.dispatchEvent(new Event("auth-change"));
-          }
-        } catch (storageError) {
-          console.error("Không thể cập nhật trạng thái tài khoản:", storageError);
-        }
-      }
-
-      alert("Đặt lại mật khẩu thành công! Hãy đăng nhập lại.");
+      await showAlert("Đặt lại mật khẩu thành công! Hãy đăng nhập lại.");
       router.push("/login");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không thể đặt lại mật khẩu.");
@@ -99,21 +98,67 @@ export default function ForgotPasswordPage() {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mã xác thực OTP (6 số)</label>
-              <input type="text" required placeholder="Nhập 6 số OTP" maxLength={6} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-center font-bold tracking-widest text-lg"
-                value={otpCode} onChange={(e) => setOtpCode(e.target.value)} />
+          <>
+            <div className="mb-5 grid grid-cols-2 gap-2" aria-label="Các bước khôi phục mật khẩu">
+              <div className={`rounded-lg px-3 py-2 text-center text-sm font-semibold ${step === 2 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                1. Xác nhận OTP
+              </div>
+              <div className={`rounded-lg px-3 py-2 text-center text-sm font-semibold ${step === 3 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                2. Mật khẩu mới
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu mới</label>
-              <input type="password" required placeholder="Nhập mật khẩu mới" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-            </div>
-            <button type="submit" disabled={loading} className="w-full bg-green-500 text-white p-3 rounded-lg font-semibold hover:bg-green-600 transition disabled:bg-gray-300">
-              {loading ? "Đang xác thực..." : "Xác nhận đổi mật khẩu"}
-            </button>
-          </form>
+            {step === 2 ? (
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <p className="text-sm text-gray-600">Nhập mã 6 số đã gửi đến <strong>{email}</strong>. Bạn cần xác nhận mã trước khi tạo mật khẩu mới.</p>
+                <div>
+                  <label htmlFor="otpCode" className="mb-1 block text-sm font-medium text-gray-700">Mã xác thực OTP</label>
+                  <input
+                    id="otpCode"
+                    type="text"
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    autoComplete="one-time-code"
+                    placeholder="Nhập 6 số OTP"
+                    maxLength={6}
+                    className="w-full rounded-lg border p-2.5 text-center text-lg font-bold tracking-widest outline-none focus:ring-2 focus:ring-green-500"
+                    value={otpCode}
+                    onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  />
+                </div>
+                <button type="submit" disabled={loading || otpCode.length !== 6} className="w-full rounded-lg bg-green-500 p-3 font-semibold text-white transition hover:bg-green-600 disabled:bg-gray-300">
+                  {loading ? "Đang xác nhận OTP..." : "Xác nhận mã OTP"}
+                </button>
+                <button type="button" onClick={() => { setStep(1); setOtpCode(""); setError(""); setMessage(""); }} className="w-full py-2 text-sm font-medium text-gray-600 hover:text-green-700">
+                  Quay lại nhập email
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <p className="text-sm text-green-700">Mã OTP đã được xác nhận. Hãy tạo mật khẩu mới cho tài khoản {email}.</p>
+                <div>
+                  <label htmlFor="newPassword" className="mb-1 block text-sm font-medium text-gray-700">Mật khẩu mới</label>
+                  <input
+                    id="newPassword"
+                    type="password"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+                    className="w-full rounded-lg border p-2.5 outline-none focus:ring-2 focus:ring-green-500"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                  />
+                </div>
+                <button type="submit" disabled={loading || newPassword.length < 6} className="w-full rounded-lg bg-green-500 p-3 font-semibold text-white transition hover:bg-green-600 disabled:bg-gray-300">
+                  {loading ? "Đang cập nhật..." : "Đặt lại mật khẩu"}
+                </button>
+                <button type="button" onClick={() => { setStep(2); setNewPassword(""); setError(""); setMessage(""); }} className="w-full py-2 text-sm font-medium text-gray-600 hover:text-green-700">
+                  Quay lại xác nhận OTP
+                </button>
+              </form>
+            )}
+          </>
         )}
       </div>
     </div>

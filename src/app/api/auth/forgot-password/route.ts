@@ -88,7 +88,33 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- BƯỚC 2: NHẬP OTP VÀ ĐỔI MẬT KHẨU MỚI ---
+    if (action === "VERIFY_OTP") {
+      if (!email || !otpCode) {
+        return NextResponse.json(
+          { message: "Vui lòng nhập email và mã OTP." },
+          { status: 400 }
+        );
+      }
+
+      const cleanEmail = String(email).toLowerCase().trim();
+      const user = await User.findOne({ email: cleanEmail });
+      if (!user || !user.otpCode || String(user.otpCode) !== String(otpCode).trim()) {
+        return NextResponse.json(
+          { message: "Mã OTP không chính xác." },
+          { status: 400 }
+        );
+      }
+      if (!user.otpExpires || new Date() > new Date(user.otpExpires)) {
+        return NextResponse.json(
+          { message: "Mã OTP đã hết hạn, vui lòng xin lại mã mới." },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({ message: "Mã OTP chính xác. Bạn có thể tạo mật khẩu mới." });
+    }
+
+    // --- BƯỚC 3: ĐỔI MẬT KHẨU SAU KHI XÁC THỰC OTP ---
     if (action === "RESET_PASSWORD") {
       if (!email || !otpCode || !newPassword) {
         return NextResponse.json(
