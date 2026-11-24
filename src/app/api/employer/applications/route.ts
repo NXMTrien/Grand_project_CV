@@ -152,6 +152,12 @@ export async function PUT(request: NextRequest) {
     if (status === previousStatus) {
       return NextResponse.json({ success: true, data: application }, { status: 200 });
     }
+    if (previousStatus === "APPROVED" || previousStatus === "REJECTED") {
+      return NextResponse.json(
+        { success: false, message: "Hồ sơ đã chốt trạng thái và không thể chỉnh sửa." },
+        { status: 409 }
+      );
+    }
 
     let notificationData: {
       type: "APPLICATION_REVIEWING" | "APPLICATION_APPROVED";

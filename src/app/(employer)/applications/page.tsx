@@ -231,6 +231,7 @@ export default function EmployerApplicationsPage() {
                 <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
                   {applications.map((item) => {
                     const resume = item.resumeId;
+                    const isFinalStatus = item.status === "APPROVED" || item.status === "REJECTED";
                     return (
                       <tr key={item._id} className="hover:bg-gray-50 transition">
                         <td className="p-4">
@@ -288,9 +289,10 @@ export default function EmployerApplicationsPage() {
                         <td className="p-4 text-right">
                           <select
                             value={item.status}
-                            disabled={updatingId === item._id}
+                            disabled={updatingId === item._id || isFinalStatus}
                             onChange={(e) => handleStatusChange(item._id, e.target.value as ApplicationStatus)}
-                            className="text-xs border rounded-lg p-1.5 outline-none bg-white shadow-sm font-medium focus:ring-2 focus:ring-emerald-500"
+                            title={isFinalStatus ? "Hồ sơ đã chốt trạng thái và không thể chỉnh sửa." : undefined}
+                            className="text-xs border rounded-lg p-1.5 outline-none bg-white shadow-sm font-medium focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                           >
                             <option value="SENT">SENT (Mới nộp)</option>
                             <option value="REVIEWING">REVIEWING (Đang xét tuyển)</option>
@@ -298,6 +300,9 @@ export default function EmployerApplicationsPage() {
                             <option value="APPROVED">APPROVED (Đã chấp thuận)</option>
                             <option value="REJECTED">REJECTED (Từ chối)</option>
                           </select>
+                          {isFinalStatus && (
+                            <p className="mt-1 text-xs text-gray-500">Đã chốt, không thể chỉnh sửa</p>
+                          )}
                         </td>
                       </tr>
                     );
